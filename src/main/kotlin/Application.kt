@@ -3,6 +3,7 @@ package com.serranoie.server
 import com.serranoie.server.plugins.configureDatabases
 import com.serranoie.server.routes.authRoutes
 import com.serranoie.server.routes.homeRoutes
+import com.serranoie.server.routes.tripAssociationRoutes
 import com.serranoie.server.security.JwtConfig
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -37,6 +38,7 @@ fun Application.module() {
 
         authenticate {
             homeRoutes()
+            tripAssociationRoutes()
         }
     }
 }

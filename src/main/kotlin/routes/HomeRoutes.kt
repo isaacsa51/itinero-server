@@ -2,10 +2,8 @@ package com.serranoie.server.routes
 
 import com.serranoie.server.models.HomeResponse
 import com.serranoie.server.repository.findAllTripsForUser
-import com.serranoie.server.repository.findTripForUser
 import com.serranoie.server.repository.findUserByEmail
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
