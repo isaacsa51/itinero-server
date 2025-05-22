@@ -1,5 +1,7 @@
 package com.serranoie.server.plugins
 
+import com.serranoie.server.repository.Trips
+import com.serranoie.server.repository.UserTrips
 import com.serranoie.server.repository.Users
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -14,7 +16,6 @@ fun configureDatabases() {
     )
 
     transaction {
-        SchemaUtils.create(Users)
+        SchemaUtils.create(Users, Trips, UserTrips)
     }
-
 }

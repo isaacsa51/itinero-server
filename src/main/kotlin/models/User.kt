@@ -9,7 +9,8 @@ data class User(
     val surname: String,
     val phone: String,
     val email: String,
-    val passwordHash: String
+    val passwordHash: String,
+    val plannedTrips: List<Int> = emptyList(),
 )
 
 @Serializable

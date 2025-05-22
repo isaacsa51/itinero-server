@@ -15,6 +15,11 @@ object Users : Table() {
     override val primaryKey = PrimaryKey(id)
 }
 
+object UserTrips : Table() {
+    val userId = integer("user_id").references(Users.id)
+    val tripId = integer("trip_id").references(Trips.id)
+}
+
 fun createUser(user: User): User = transaction {
     val userId = Users.insert {
         it[name] = user.name
