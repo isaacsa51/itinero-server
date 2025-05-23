@@ -3,23 +3,21 @@ package com.serranoie.server.routes
 import com.serranoie.server.models.*
 import com.serranoie.server.repository.*
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Route.tripSettingsRoutes() {
     authenticate {
         // Trip Info Settings Routes
-        get("/trips/{id}/info") {
+        get("/trips/{groupCode}/info") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@get
             }
@@ -27,6 +25,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@get
             }
 
@@ -48,12 +53,12 @@ fun Route.tripSettingsRoutes() {
             call.respond(tripInfo)
         }
 
-        put("/trips/{id}/info") {
+        put("/trips/{groupCode}/info") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@put
             }
@@ -61,6 +66,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@put
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@put
             }
 
@@ -79,12 +91,12 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Group Settings Routes
-        get("/trips/{id}/group") {
+        get("/trips/{groupCode}/group") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@get
             }
@@ -92,6 +104,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@get
             }
 
@@ -113,12 +132,12 @@ fun Route.tripSettingsRoutes() {
             call.respond(groupSettings)
         }
 
-        put("/trips/{id}/group") {
+        put("/trips/{groupCode}/group") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@put
             }
@@ -126,6 +145,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@put
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@put
             }
 
@@ -144,12 +170,12 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Get pending members
-        get("/trips/{id}/pending") {
+        get("/trips/{groupCode}/pending") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@get
             }
@@ -157,6 +183,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@get
             }
 
@@ -171,12 +204,12 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Invite member by email
-        post("/trips/{id}/invite") {
+        post("/trips/{groupCode}/invite") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@post
             }
@@ -184,6 +217,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@post
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@post
             }
 
@@ -234,13 +274,13 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Member Management
-        post("/trips/{id}/members/{memberId}/accept") {
+        post("/trips/{groupCode}/members/{memberId}/accept") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
             val memberId = call.parameters["memberId"]?.toIntOrNull()
 
-            if (email == null || tripId == null || memberId == null) {
+            if (email == null || groupCode == null || memberId == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@post
             }
@@ -248,6 +288,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@post
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@post
             }
 
@@ -264,13 +311,13 @@ fun Route.tripSettingsRoutes() {
             }
         }
 
-        delete("/trips/{id}/members/{memberId}") {
+        delete("/trips/{groupCode}/members/{memberId}") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
             val memberId = call.parameters["memberId"]?.toIntOrNull()
 
-            if (email == null || tripId == null || memberId == null) {
+            if (email == null || groupCode == null || memberId == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@delete
             }
@@ -278,6 +325,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@delete
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@delete
             }
 
@@ -295,12 +349,12 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Leave Trip (for members)
-        delete("/trips/{id}/leave") {
+        delete("/trips/{groupCode}/leave") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@delete
             }
@@ -308,6 +362,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@delete
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@delete
             }
 
@@ -328,12 +389,12 @@ fun Route.tripSettingsRoutes() {
         }
 
         // Delete Trip (owner only)
-        delete("/trips/{id}") {
+        delete("/trips/{groupCode}") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["id"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@delete
             }
@@ -341,6 +402,13 @@ fun Route.tripSettingsRoutes() {
             val user = findUserByEmail(email)
             if (user == null) {
                 call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@delete
+            }
+
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@delete
             }
 

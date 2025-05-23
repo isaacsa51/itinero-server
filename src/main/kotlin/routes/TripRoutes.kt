@@ -5,6 +5,7 @@ import com.serranoie.server.repository.Trips
 import com.serranoie.server.repository.addMemberToTrip
 import com.serranoie.server.repository.createCompleteTrip
 import com.serranoie.server.repository.findUserByEmail
+import com.serranoie.server.repository.findTripByGroupCode
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -19,12 +20,13 @@ import java.time.temporal.ChronoUnit
 
 fun Route.tripAssociationRoutes() {
     authenticate {
-        post("/trips/{tripId}/join") {
+        // Using groupCode in URL instead of numeric ID
+        post("/trips/{groupCode}/join") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
-            val tripId = call.parameters["tripId"]?.toIntOrNull()
+            val groupCode = call.parameters["groupCode"]
 
-            if (email == null || tripId == null) {
+            if (email == null || groupCode == null) {
                 call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
                 return@post
             }
@@ -35,17 +37,19 @@ fun Route.tripAssociationRoutes() {
                 return@post
             }
 
-            val tripExists = transaction {
-                Trips.selectAll().where { Trips.id eq tripId }.count() > 0
-            }
-
-            if (!tripExists) {
+            // Find trip by group code
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
                 call.respond(HttpStatusCode.NotFound, "Trip not found")
                 return@post
             }
 
-            addMemberToTrip(user.id, tripId)
-            call.respond(HttpStatusCode.OK, "User added to trip $tripId")
+            val result = addMemberToTrip(user.id, tripId)
+            if (result) {
+                call.respond(HttpStatusCode.OK, "Join request sent. Waiting for approval.")
+            } else {
+                call.respond(HttpStatusCode.OK, "You're already a member of this trip.")
+            }
         }
 
         // Route for creating a new trip

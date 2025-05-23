@@ -241,3 +241,11 @@ fun updateGroupSettings(tripId: Int, request: UpdateGroupSettingsRequest): Boole
         it[summary] = request.summary
     } > 0
 }
+
+// Get trip by groupCode
+fun findTripByGroupCode(groupCode: String): Int? = transaction {
+    Trips.selectAll()
+        .where { Trips.groupCode eq groupCode }
+        .map { it[Trips.id] }
+        .singleOrNull()
+}
