@@ -26,14 +26,12 @@ fun Route.homeRoutes() {
                 return@get
             }
 
-            // Get all trips for the user (for both owned trips and as a member)
             val allTrips = findMemberTrips(user.id)
             if (allTrips.isEmpty()) {
                 call.respondText("No trips found", status = HttpStatusCode.NotFound)
                 return@get
             }
             
-            // For now, we just return the first trip
             val currentTrip = allTrips.first()
 
             call.respond(HomeResponse(currentTrip = currentTrip, allTrips = allTrips))

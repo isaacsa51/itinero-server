@@ -41,15 +41,3 @@ data class Location(
 enum class TravelDirection {
     OUTBOUND, RETURN
 }
-
-@Serializable
-data class CreateTripRequest(
-    val destination: String,
-    val startDate: String,
-    val endDate: String,
-    val summary: String,
-    val accommodation: Accommodation,
-    val reservationCode: String? = null,
-    val extraInfo: String? = null,
-    val additionalInfo: String? = null
-)
