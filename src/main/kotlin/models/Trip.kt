@@ -6,22 +6,27 @@ import kotlinx.serialization.Serializable
 data class Trip(
     val id: Int,
     val destination: String,
-    val startDate: String,      // ISO 8601 (yyyy-MM-dd)
-    val endDate: String,        // ISO 8601
+    val startDate: String,
+    val endDate: String,
     val totalDays: Int,
-    val summary: String,        // Markdown
+    val summary: String,
     val totalMembers: Int,
     val travelDirection: TravelDirection,
     val hasPendingActions: Boolean,
-    val accommodation: Accommodation
+    val accommodation: Accommodation,
+    val reservationCode: String? = null,
+    val extraInfo: String? = null,
+    val additionalInfo: String? = null,
+    val groupCode: String,
+    val ownerId: Int,
 )
 
 @Serializable
 data class Accommodation(
     val name: String,
     val phone: String,
-    val checkIn: String,        // ISO 8601 DateTime
-    val checkOut: String,       // ISO 8601 DateTime
+    val checkIn: String,
+    val checkOut: String,
     val location: Location
 )
 
@@ -36,3 +41,15 @@ data class Location(
 enum class TravelDirection {
     OUTBOUND, RETURN
 }
+
+@Serializable
+data class CreateTripRequest(
+    val destination: String,
+    val startDate: String,
+    val endDate: String,
+    val summary: String,
+    val accommodation: Accommodation,
+    val reservationCode: String? = null,
+    val extraInfo: String? = null,
+    val additionalInfo: String? = null
+)

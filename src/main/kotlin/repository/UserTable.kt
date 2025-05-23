@@ -43,27 +43,46 @@ fun findUserByEmail(email: String): User? = transaction {
         }.singleOrNull()
 }
 
+/**
+ * @deprecated This function uses the legacy UserTrips table instead of TripMembers.
+ * Use findMemberTrips from TripMembersTable.kt instead, which uses the newer schema
+ * with proper member status tracking.
+ */
+@Deprecated(
+    "Use findMemberTrips from TripMembersTable.kt instead",
+    ReplaceWith("findMemberTrips(userId)", "com.serranoie.server.repository.findMemberTrips")
+)
 fun findTripsForUser(userId: Int): List<Trip> = transaction {
-    (UserTrips innerJoin Trips).selectAll().where { UserTrips.userId eq userId }.map {
-        Trip(
-            id = it[Trips.id],
-            destination = it[Trips.destination],
-            startDate = it[Trips.startDate].toString(),
-            endDate = it[Trips.endDate].toString(),
-            totalDays = it[Trips.totalDays],
-            summary = it[Trips.summary],
-            totalMembers = it[Trips.totalMembers],
-            travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
-            hasPendingActions = it[Trips.hasPendingActions],
-            accommodation = Accommodation(
-                name = it[Trips.accommodationName],
-                phone = it[Trips.accommodationPhone],
-                checkIn = it[Trips.checkIn].toString(),
-                checkOut = it[Trips.checkOut].toString(),
-                location = Location(
-                    name = it[Trips.locationName], latitude = it[Trips.latitude], longitude = it[Trips.longitude]
-                )
+    (UserTrips innerJoin Trips)
+        .selectAll()
+        .where { UserTrips.userId eq userId }
+        .map {
+            Trip(
+                id = it[Trips.id],
+                destination = it[Trips.destination],
+                startDate = it[Trips.startDate],
+                endDate = it[Trips.endDate],
+                totalDays = it[Trips.totalDays],
+                summary = it[Trips.summary],
+                totalMembers = it[Trips.totalMembers],
+                travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
+                hasPendingActions = it[Trips.hasPendingActions],
+                accommodation = Accommodation(
+                    name = it[Trips.accommodationName],
+                    phone = it[Trips.accommodationPhone],
+                    checkIn = it[Trips.checkIn],
+                    checkOut = it[Trips.checkOut],
+                    location = Location(
+                        name = it[Trips.locationName],
+                        latitude = it[Trips.latitude],
+                        longitude = it[Trips.longitude]
+                    )
+                ),
+                reservationCode = it[Trips.reservationCode],
+                extraInfo = it[Trips.extraInfo],
+                additionalInfo = it[Trips.additionalInfo],
+                groupCode = it[Trips.groupCode],
+                ownerId = it[Trips.ownerId]
             )
-        )
-    }
+        }
 }

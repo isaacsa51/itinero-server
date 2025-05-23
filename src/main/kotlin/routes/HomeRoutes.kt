@@ -1,7 +1,7 @@
 package com.serranoie.server.routes
 
 import com.serranoie.server.models.HomeResponse
-import com.serranoie.server.repository.findAllTripsForUser
+import com.serranoie.server.repository.findMemberTrips
 import com.serranoie.server.repository.findUserByEmail
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -26,14 +26,14 @@ fun Route.homeRoutes() {
                 return@get
             }
 
-            // Get all trips for the user (for future multi-trip support)
-            val allTrips = findAllTripsForUser(user.id)
+            // Get all trips for the user (for both owned trips and as a member)
+            val allTrips = findMemberTrips(user.id)
             if (allTrips.isEmpty()) {
                 call.respondText("No trips found", status = HttpStatusCode.NotFound)
                 return@get
             }
             
-            // For now, we just return the first trip as before
+            // For now, we just return the first trip
             val currentTrip = allTrips.first()
 
             call.respond(HomeResponse(currentTrip = currentTrip, allTrips = allTrips))

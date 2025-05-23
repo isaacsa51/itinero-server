@@ -1,5 +1,7 @@
 package com.serranoie.server.plugins
 
+import com.serranoie.server.repository.TripInfoTable
+import com.serranoie.server.repository.TripMembers
 import com.serranoie.server.repository.Trips
 import com.serranoie.server.repository.UserTrips
 import com.serranoie.server.repository.Users
@@ -16,6 +18,6 @@ fun configureDatabases() {
     )
 
     transaction {
-        SchemaUtils.create(Users, Trips, UserTrips)
+        SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable)
     }
 }

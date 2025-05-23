@@ -4,6 +4,8 @@ import com.serranoie.server.plugins.configureDatabases
 import com.serranoie.server.routes.authRoutes
 import com.serranoie.server.routes.homeRoutes
 import com.serranoie.server.routes.tripAssociationRoutes
+import com.serranoie.server.routes.tripCreationRoute
+import com.serranoie.server.routes.tripSettingsRoutes
 import com.serranoie.server.security.JwtConfig
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -37,8 +39,17 @@ fun Application.module() {
         authRoutes()
 
         authenticate {
+            // Home and trip information endpoints
             homeRoutes()
+
+            // Trip creation endpoint
+            tripCreationRoute()
+
+            // Trip association and group management endpoints
             tripAssociationRoutes()
+
+            // Trip settings and member management endpoints
+            tripSettingsRoutes()
         }
     }
 }

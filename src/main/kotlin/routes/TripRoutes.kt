@@ -1,7 +1,7 @@
 package com.serranoie.server.routes
 
 import com.serranoie.server.repository.Trips
-import com.serranoie.server.repository.addUserToTrip
+import com.serranoie.server.repository.addMemberToTrip
 import com.serranoie.server.repository.findUserByEmail
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -38,7 +38,7 @@ fun Route.tripAssociationRoutes() {
                 return@post
             }
 
-            addUserToTrip(user.id, tripId)
+            addMemberToTrip(user.id, tripId)
             call.respond(HttpStatusCode.OK, "User added to trip $tripId")
         }
     }
