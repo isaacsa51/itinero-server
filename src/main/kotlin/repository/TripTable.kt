@@ -67,7 +67,6 @@ fun generateUniqueGroupCode(startDate: String, endDate: String): String = transa
     return@transaction code
 }
 
-// Create a complete trip with an owner
 fun createCompleteTrip(
     ownerId: Int,
     destination: String,

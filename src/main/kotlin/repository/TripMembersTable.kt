@@ -42,7 +42,6 @@ fun inviteMemberByEmail(email: String, tripId: Int): Boolean = transaction {
         return@transaction false
     }
 
-    // Add as pending member
     TripMembers.insert {
         it[userId] = user.id
         it[TripMembers.tripId] = tripId
@@ -68,7 +67,6 @@ fun joinGroupByCode(userId: Int, groupCode: String): Int? = transaction {
         return@transaction tripId
     }
 
-    // Add as pending member
     TripMembers.insert {
         it[TripMembers.userId] = userId
         it[TripMembers.tripId] = tripId
@@ -242,7 +240,6 @@ fun updateGroupSettings(tripId: Int, request: UpdateGroupSettingsRequest): Boole
     } > 0
 }
 
-// Get trip by groupCode
 fun findTripByGroupCode(groupCode: String): Int? = transaction {
     Trips.selectAll()
         .where { Trips.groupCode eq groupCode }

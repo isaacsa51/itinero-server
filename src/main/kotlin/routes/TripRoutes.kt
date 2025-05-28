@@ -20,7 +20,6 @@ import java.time.temporal.ChronoUnit
 
 fun Route.tripAssociationRoutes() {
     authenticate {
-        // Using groupCode in URL instead of numeric ID
         post("/trips/{groupCode}/join") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -37,7 +36,6 @@ fun Route.tripAssociationRoutes() {
                 return@post
             }
 
-            // Find trip by group code
             val tripId = findTripByGroupCode(groupCode)
             if (tripId == null) {
                 call.respond(HttpStatusCode.NotFound, "Trip not found")
@@ -52,7 +50,6 @@ fun Route.tripAssociationRoutes() {
             }
         }
 
-        // Route for creating a new trip
         post("/trips/new") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -71,13 +68,11 @@ fun Route.tripAssociationRoutes() {
             try {
                 val request = call.receive<CreateTripRequest>()
 
-                // Calculate total days between start and end dates
                 val formatter = DateTimeFormatter.ISO_DATE
                 val startDate = LocalDate.parse(request.startDate, formatter)
                 val endDate = LocalDate.parse(request.endDate, formatter)
                 val totalDays = ChronoUnit.DAYS.between(startDate, endDate).toInt() + 1
 
-                // Create the trip using the createCompleteTrip function
                 val trip = createCompleteTrip(
                     ownerId = user.id,
                     destination = request.destination,

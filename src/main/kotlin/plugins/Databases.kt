@@ -17,6 +17,8 @@ fun configureDatabases() {
         password = "",
     )
 
+    org.h2.tools.Server.createWebServer("-web", "-webAllowOthers", "-webPort", "8082").start()
+
     transaction {
         SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable)
     }

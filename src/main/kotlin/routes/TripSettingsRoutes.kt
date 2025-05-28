@@ -3,48 +3,27 @@ package com.serranoie.server.routes
 import com.serranoie.server.models.*
 import com.serranoie.server.repository.*
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
+private data class TripAccessResult(
+    val tripId: Int,
+    val user: User,
+    val isOwner: Boolean,
+    val isMember: Boolean
+)
+
 fun Route.tripSettingsRoutes() {
     authenticate {
         // Trip Info Settings Routes
         get("/trips/{groupCode}/info") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
+            val result = validateTripAccess(call) ?: return@get
 
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@get
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Check if user is member or owner
-            val isOwner = isUserTripOwner(user.id, tripId)
-            val isMember = isTripMember(user.id, tripId)
-
-            if (!isOwner && !isMember) {
-                call.respondText("Unauthorized", status = HttpStatusCode.Forbidden)
-                return@get
-            }
-
-            val tripInfo = getTripInfoSettings(tripId)
+            val tripInfo = getTripInfoSettings(result.tripId)
             if (tripInfo == null) {
                 call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@get
@@ -54,36 +33,10 @@ fun Route.tripSettingsRoutes() {
         }
 
         put("/trips/{groupCode}/info") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
-
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@put
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@put
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@put
-            }
-
-            // Only owner can update trip info
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can update trip info", status = HttpStatusCode.Forbidden)
-                return@put
-            }
+            val result = validateTripAccess(call, requireOwner = true) ?: return@put
 
             val request = call.receive<UpdateTripInfoRequest>()
-            if (updateTripInfo(tripId, request)) {
+            if (updateTripInfo(result.tripId, request)) {
                 call.respondText("Trip info updated successfully", status = HttpStatusCode.OK)
             } else {
                 call.respondText("Failed to update trip info", status = HttpStatusCode.InternalServerError)
@@ -92,38 +45,9 @@ fun Route.tripSettingsRoutes() {
 
         // Group Settings Routes
         get("/trips/{groupCode}/group") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
+            val result = validateTripAccess(call) ?: return@get
 
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@get
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Check if user is member or owner
-            val isOwner = isUserTripOwner(user.id, tripId)
-            val isMember = isTripMember(user.id, tripId)
-
-            if (!isOwner && !isMember) {
-                call.respondText("Unauthorized", status = HttpStatusCode.Forbidden)
-                return@get
-            }
-
-            val groupSettings = getGroupSettings(tripId, user.id)
+            val groupSettings = getGroupSettings(result.tripId, result.user.id)
             if (groupSettings == null) {
                 call.respondText("Trip not found", status = HttpStatusCode.NotFound)
                 return@get
@@ -133,36 +57,10 @@ fun Route.tripSettingsRoutes() {
         }
 
         put("/trips/{groupCode}/group") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
-
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@put
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@put
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@put
-            }
-
-            // Only owner can update trip settings
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can update group settings", status = HttpStatusCode.Forbidden)
-                return@put
-            }
+            val result = validateTripAccess(call, requireOwner = true) ?: return@put
 
             val request = call.receive<UpdateGroupSettingsRequest>()
-            if (updateGroupSettings(tripId, request)) {
+            if (updateGroupSettings(result.tripId, request)) {
                 call.respondText("Group settings updated successfully", status = HttpStatusCode.OK)
             } else {
                 call.respondText("Failed to update group settings", status = HttpStatusCode.InternalServerError)
@@ -171,71 +69,19 @@ fun Route.tripSettingsRoutes() {
 
         // Get pending members
         get("/trips/{groupCode}/pending") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
+            val result = validateTripAccess(call, requireOwner = true) ?: return@get
 
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@get
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@get
-            }
-
-            // Only owner can see pending members
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can view pending members", status = HttpStatusCode.Forbidden)
-                return@get
-            }
-
-            val pendingMembers = getPendingMembers(tripId)
+            val pendingMembers = getPendingMembers(result.tripId)
             call.respond(pendingMembers)
         }
 
         // Invite member by email
         post("/trips/{groupCode}/invite") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
-
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@post
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@post
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@post
-            }
-
-            // Only owner can invite members
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can invite members", status = HttpStatusCode.Forbidden)
-                return@post
-            }
+            val result = validateTripAccess(call, requireOwner = true) ?: return@post
 
             val request = call.receive<InviteMemberRequest>()
 
-            if (inviteMemberByEmail(request.email, tripId)) {
+            if (inviteMemberByEmail(request.email, result.tripId)) {
                 call.respond(MemberActionResponse(true, "Invitation sent successfully"))
             } else {
                 call.respond(
@@ -275,36 +121,15 @@ fun Route.tripSettingsRoutes() {
 
         // Member Management
         post("/trips/{groupCode}/members/{memberId}/accept") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
             val memberId = call.parameters["memberId"]?.toIntOrNull()
-
-            if (email == null || groupCode == null || memberId == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
+            if (memberId == null) {
+                call.respondText("Invalid member ID", status = HttpStatusCode.BadRequest)
                 return@post
             }
 
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@post
-            }
+            val result = validateTripAccess(call, requireOwner = true) ?: return@post
 
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@post
-            }
-
-            // Only owner can accept members
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can manage members", status = HttpStatusCode.Forbidden)
-                return@post
-            }
-
-            if (acceptTripMember(memberId, tripId)) {
+            if (acceptTripMember(memberId, result.tripId)) {
                 call.respond(MemberActionResponse(true, "Member accepted successfully"))
             } else {
                 call.respond(MemberActionResponse(false, "Failed to accept member"))
@@ -312,36 +137,15 @@ fun Route.tripSettingsRoutes() {
         }
 
         delete("/trips/{groupCode}/members/{memberId}") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
             val memberId = call.parameters["memberId"]?.toIntOrNull()
-
-            if (email == null || groupCode == null || memberId == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
+            if (memberId == null) {
+                call.respondText("Invalid member ID", status = HttpStatusCode.BadRequest)
                 return@delete
             }
 
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
+            val result = validateTripAccess(call, requireOwner = true) ?: return@delete
 
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
-
-            // Only owner can reject/remove members
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can manage members", status = HttpStatusCode.Forbidden)
-                return@delete
-            }
-
-            if (rejectTripMember(memberId, tripId)) {
+            if (rejectTripMember(memberId, result.tripId)) {
                 call.respond(MemberActionResponse(true, "Member removed successfully"))
             } else {
                 call.respond(MemberActionResponse(false, "Failed to remove member"))
@@ -350,30 +154,10 @@ fun Route.tripSettingsRoutes() {
 
         // Leave Trip (for members)
         delete("/trips/{groupCode}/leave") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
-
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@delete
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
+            val result = validateTripAccess(call) ?: return@delete
 
             // Owner cannot leave, only delete
-            if (isUserTripOwner(user.id, tripId)) {
+            if (result.isOwner) {
                 call.respondText(
                     "Trip owner cannot leave. Use delete trip instead.",
                     status = HttpStatusCode.BadRequest
@@ -381,7 +165,7 @@ fun Route.tripSettingsRoutes() {
                 return@delete
             }
 
-            if (leaveTrip(user.id, tripId)) {
+            if (leaveTrip(result.user.id, result.tripId)) {
                 call.respond(MemberActionResponse(true, "Left trip successfully"))
             } else {
                 call.respond(MemberActionResponse(false, "Failed to leave trip"))
@@ -390,36 +174,56 @@ fun Route.tripSettingsRoutes() {
 
         // Delete Trip (owner only)
         delete("/trips/{groupCode}") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-            val groupCode = call.parameters["groupCode"]
+            val result = validateTripAccess(call, requireOwner = true) ?: return@delete
 
-            if (email == null || groupCode == null) {
-                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
-                return@delete
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
-
-            // Find trip by group code
-            val tripId = findTripByGroupCode(groupCode)
-            if (tripId == null) {
-                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
-                return@delete
-            }
-
-            // Only owner can delete trip
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respondText("Only the trip owner can delete the trip", status = HttpStatusCode.Forbidden)
-                return@delete
-            }
-
-            deleteTrip(tripId)
+            deleteTrip(result.tripId)
             call.respond(MemberActionResponse(true, "Trip deleted successfully"))
         }
     }
+}
+
+// Helper function to validate trip access
+private suspend fun validateTripAccess(
+    call: ApplicationCall,
+    requireOwner: Boolean = false
+): TripAccessResult? {
+    val principal = call.principal<JWTPrincipal>()
+    val email = principal?.payload?.getClaim("email")?.asString()
+    val groupCode = call.parameters["groupCode"]
+
+    if (email == null || groupCode == null) {
+        call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
+        return null
+    }
+
+    val user = findUserByEmail(email)
+    if (user == null) {
+        call.respondText("User not found", status = HttpStatusCode.NotFound)
+        return null
+    }
+
+    // Find trip by group code
+    val tripId = findTripByGroupCode(groupCode)
+    if (tripId == null) {
+        call.respondText("Trip not found", status = HttpStatusCode.NotFound)
+        return null
+    }
+
+    // Check if user is member or owner
+    val isOwner = isUserTripOwner(user.id, tripId)
+    val isMember = isTripMember(user.id, tripId)
+
+    // If we require owner and user is not the owner
+    if (requireOwner && !isOwner) {
+        call.respondText("Only the trip owner can perform this action", status = HttpStatusCode.Forbidden)
+        return null
+    }
+
+    // If user is neither owner nor member
+    if (!isOwner && !isMember) {
+        call.respondText("Unauthorized", status = HttpStatusCode.Forbidden)
+        return null
+    }
+
+    return TripAccessResult(tripId, user, isOwner, isMember)
 }

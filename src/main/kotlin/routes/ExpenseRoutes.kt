@@ -11,7 +11,6 @@ import io.ktor.server.routing.*
 
 fun Route.expenseRoutes() {
     authenticate {
-        // Create expense
         post("/expenses") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -46,7 +45,6 @@ fun Route.expenseRoutes() {
             }
         }
 
-        // Get expenses for a trip
         get("/trips/{tripId}/expenses") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -77,7 +75,6 @@ fun Route.expenseRoutes() {
             call.respond(expenses)
         }
 
-        // Get expense summary for a trip
         get("/trips/{tripId}/expenses/summary") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -108,7 +105,6 @@ fun Route.expenseRoutes() {
             call.respond(summary)
         }
 
-        // Mark expense as completed
         post("/expenses/{id}/complete") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -136,7 +132,6 @@ fun Route.expenseRoutes() {
             }
         }
 
-        // Delete expense
         delete("/expenses/{id}") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
