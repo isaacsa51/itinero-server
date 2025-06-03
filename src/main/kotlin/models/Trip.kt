@@ -8,7 +8,6 @@ data class Trip(
     val destination: String,
     val startDate: String,
     val endDate: String,
-    val totalDays: Int,
     val summary: String,
     val totalMembers: Int,
     val travelDirection: TravelDirection,
@@ -27,8 +26,14 @@ data class Accommodation(
     val phone: String,
     val checkIn: String,
     val checkOut: String,
-    val location: Location
+    val location: String,
+    val mapUri: String
 )
+
+@Serializable
+enum class TravelDirection {
+    OUTBOUND, RETURN
+}
 
 @Serializable
 data class Location(
@@ -36,8 +41,3 @@ data class Location(
     val latitude: Double,
     val longitude: Double
 )
-
-@Serializable
-enum class TravelDirection {
-    OUTBOUND, RETURN
-}

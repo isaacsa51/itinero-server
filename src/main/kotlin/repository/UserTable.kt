@@ -62,7 +62,6 @@ fun findTripsForUser(userId: Int): List<Trip> = transaction {
                 destination = it[Trips.destination],
                 startDate = it[Trips.startDate],
                 endDate = it[Trips.endDate],
-                totalDays = it[Trips.totalDays],
                 summary = it[Trips.summary],
                 totalMembers = it[Trips.totalMembers],
                 travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
@@ -72,11 +71,8 @@ fun findTripsForUser(userId: Int): List<Trip> = transaction {
                     phone = it[Trips.accommodationPhone],
                     checkIn = it[Trips.checkIn],
                     checkOut = it[Trips.checkOut],
-                    location = Location(
-                        name = it[Trips.locationName],
-                        latitude = it[Trips.latitude],
-                        longitude = it[Trips.longitude]
-                    )
+                    location = it[Trips.location],
+                    mapUri = it[Trips.mapUri]
                 ),
                 reservationCode = it[Trips.reservationCode],
                 extraInfo = it[Trips.extraInfo],

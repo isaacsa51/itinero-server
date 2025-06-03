@@ -1,11 +1,7 @@
 package com.serranoie.server.routes
 
 import com.serranoie.server.models.CreateTripRequest
-import com.serranoie.server.repository.Trips
-import com.serranoie.server.repository.addMemberToTrip
-import com.serranoie.server.repository.createCompleteTrip
-import com.serranoie.server.repository.findUserByEmail
-import com.serranoie.server.repository.findTripByGroupCode
+import com.serranoie.server.repository.*
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -20,6 +16,25 @@ import java.time.temporal.ChronoUnit
 
 fun Route.tripAssociationRoutes() {
     authenticate {
+        get("/trips") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+
+            if (email == null) {
+                call.respondText("Unauthorized", status = HttpStatusCode.Unauthorized)
+                return@get
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            val trips = getTripsForUser(user.id)
+            call.respond(trips)
+        }
+
         post("/trips/{groupCode}/join") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -68,17 +83,11 @@ fun Route.tripAssociationRoutes() {
             try {
                 val request = call.receive<CreateTripRequest>()
 
-                val formatter = DateTimeFormatter.ISO_DATE
-                val startDate = LocalDate.parse(request.startDate, formatter)
-                val endDate = LocalDate.parse(request.endDate, formatter)
-                val totalDays = ChronoUnit.DAYS.between(startDate, endDate).toInt() + 1
-
                 val trip = createCompleteTrip(
                     ownerId = user.id,
                     destination = request.destination,
                     startDate = request.startDate,
                     endDate = request.endDate,
-                    totalDays = totalDays,
                     summary = request.summary,
                     accommodation = request.accommodation,
                     reservationCode = request.reservationCode,
@@ -90,8 +99,7 @@ fun Route.tripAssociationRoutes() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 call.respondText(
-                    "Failed to create trip: ${e.message}",
-                    status = HttpStatusCode.InternalServerError
+                    "Failed to create trip: ${e.message}", status = HttpStatusCode.InternalServerError
                 )
             }
         }

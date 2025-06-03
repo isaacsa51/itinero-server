@@ -150,7 +150,6 @@ fun findMemberTrips(userId: Int): List<Trip> = transaction {
                 destination = it[Trips.destination],
                 startDate = it[Trips.startDate],
                 endDate = it[Trips.endDate],
-                totalDays = it[Trips.totalDays],
                 summary = it[Trips.summary],
                 totalMembers = it[Trips.totalMembers],
                 travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
@@ -160,11 +159,8 @@ fun findMemberTrips(userId: Int): List<Trip> = transaction {
                     phone = it[Trips.accommodationPhone],
                     checkIn = it[Trips.checkIn],
                     checkOut = it[Trips.checkOut],
-                    location = Location(
-                        name = it[Trips.locationName],
-                        latitude = it[Trips.latitude],
-                        longitude = it[Trips.longitude]
-                    )
+                    location = it[Trips.location],
+                    mapUri = it[Trips.mapUri]
                 ),
                 reservationCode = it[Trips.reservationCode],
                 extraInfo = it[Trips.extraInfo],
@@ -187,9 +183,9 @@ fun getTripInfoSettings(tripId: Int): TripInfoSettings? = transaction {
                 phone = it[Trips.accommodationPhone],
                 reservationCode = it[Trips.reservationCode],
                 location = Location(
-                    name = it[Trips.locationName],
-                    latitude = it[Trips.latitude],
-                    longitude = it[Trips.longitude]
+                    name = it[Trips.location],
+                    latitude = 0.0,
+                    longitude = 0.0
                 ),
                 additionalLocationInfo = it[Trips.extraInfo],
                 generalInfo = it[Trips.additionalInfo]
@@ -204,9 +200,7 @@ fun updateTripInfo(tripId: Int, request: UpdateTripInfoRequest): Boolean = trans
         it[checkOut] = request.checkOut
         it[accommodationPhone] = request.phone
         it[reservationCode] = request.reservationCode
-        it[locationName] = request.locationName
-        it[latitude] = request.latitude
-        it[longitude] = request.longitude
+        it[location] = request.locationName
         it[extraInfo] = request.additionalLocationInfo
         it[additionalInfo] = request.generalInfo
     } > 0
