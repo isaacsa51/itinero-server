@@ -10,8 +10,6 @@ data class Trip(
     val endDate: String,
     val summary: String,
     val totalMembers: Int,
-    val travelDirection: TravelDirection,
-    val hasPendingActions: Boolean,
     val accommodation: Accommodation,
     val reservationCode: String? = null,
     val extraInfo: String? = null,
@@ -29,11 +27,6 @@ data class Accommodation(
     val location: String,
     val mapUri: String
 )
-
-@Serializable
-enum class TravelDirection {
-    OUTBOUND, RETURN
-}
 
 @Serializable
 data class Location(

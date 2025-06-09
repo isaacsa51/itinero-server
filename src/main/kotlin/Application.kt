@@ -3,7 +3,6 @@ package com.serranoie.server
 import com.serranoie.server.plugins.configureDatabases
 import com.serranoie.server.routes.authRoutes
 import com.serranoie.server.routes.expenseRoutes
-import com.serranoie.server.routes.homeRoutes
 import com.serranoie.server.routes.tripAssociationRoutes
 import com.serranoie.server.routes.tripSettingsRoutes
 import com.serranoie.server.security.JwtConfig
@@ -45,9 +44,6 @@ fun Application.module() {
         authRoutes()
 
         authenticate {
-            // Home and trip information endpoints
-            homeRoutes()
-
             // Trip association and group management endpoints
             tripAssociationRoutes()
 

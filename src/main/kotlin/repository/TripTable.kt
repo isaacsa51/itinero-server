@@ -1,7 +1,6 @@
 package com.serranoie.server.repository
 
 import com.serranoie.server.models.Accommodation
-import com.serranoie.server.models.TravelDirection
 import com.serranoie.server.models.Trip
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.and
@@ -19,8 +18,6 @@ object Trips : Table() {
     val endDate = varchar("end_date", 10)
     val summary = text("summary")
     val totalMembers = integer("total_members")
-    val travelDirection = varchar("travel_direction", 10) // OUTBOUND / RETURN
-    val hasPendingActions = bool("has_pending_actions")
     val accommodationName = varchar("accommodation_name", 100)
     val accommodationPhone = varchar("accommodation_phone", 20)
     val checkIn = varchar("check_in", 19)
@@ -36,13 +33,36 @@ object Trips : Table() {
     override val primaryKey = PrimaryKey(id)
 }
 
+fun getTripById(tripId: Int): Trip? = transaction {
+    Trips.selectAll().where { Trips.id eq tripId }.map { row ->
+        Trip(
+            id = row[Trips.id],
+            destination = row[Trips.destination],
+            startDate = row[Trips.startDate],
+            endDate = row[Trips.endDate],
+            summary = row[Trips.summary],
+            totalMembers = row[Trips.totalMembers],
+            accommodation = Accommodation(
+                name = row[Trips.accommodationName],
+                phone = row[Trips.accommodationPhone],
+                checkIn = row[Trips.checkIn],
+                checkOut = row[Trips.checkOut],
+                location = row[Trips.location],
+                mapUri = row[Trips.mapUri]
+            ),
+            reservationCode = row[Trips.reservationCode],
+            extraInfo = row[Trips.extraInfo],
+            additionalInfo = row[Trips.additionalInfo],
+            groupCode = row[Trips.groupCode],
+            ownerId = row[Trips.ownerId]
+        )
+    }.singleOrNull()
+}
+
 fun getTripsForUser(userId: Int): List<Trip> = transaction {
-    (TripMembers innerJoin Trips)
-        .selectAll().
-        where{
+    (TripMembers innerJoin Trips).selectAll().where {
             TripMembers.userId eq userId and (TripMembers.isAccepted eq true)
-        }
-        .map { row ->
+        }.map { row ->
             Trip(
                 id = row[Trips.id],
                 destination = row[Trips.destination],
@@ -50,8 +70,6 @@ fun getTripsForUser(userId: Int): List<Trip> = transaction {
                 endDate = row[Trips.endDate],
                 summary = row[Trips.summary],
                 totalMembers = row[Trips.totalMembers],
-                travelDirection = TravelDirection.valueOf(row[Trips.travelDirection]),
-                hasPendingActions = row[Trips.hasPendingActions],
                 accommodation = Accommodation(
                     name = row[Trips.accommodationName],
                     phone = row[Trips.accommodationPhone],
@@ -119,8 +137,6 @@ fun createCompleteTrip(
         it[Trips.endDate] = endDate
         it[Trips.summary] = summary
         it[Trips.totalMembers] = 1  // Initially just the owner
-        it[Trips.travelDirection] = TravelDirection.OUTBOUND.name
-        it[Trips.hasPendingActions] = false
         it[Trips.accommodationName] = accommodation.name
         it[Trips.accommodationPhone] = accommodation.phone
         it[Trips.checkIn] = accommodation.checkIn
@@ -149,8 +165,6 @@ fun createCompleteTrip(
         endDate = endDate,
         summary = summary,
         totalMembers = 1,
-        travelDirection = TravelDirection.OUTBOUND,
-        hasPendingActions = false,
         accommodation = accommodation,
         reservationCode = reservationCode,
         extraInfo = extraInfo,
@@ -168,8 +182,6 @@ fun createTrip(trip: Trip, userId: Int): Trip = transaction {
         it[endDate] = trip.endDate
         it[summary] = trip.summary
         it[totalMembers] = trip.totalMembers
-        it[travelDirection] = trip.travelDirection.name
-        it[hasPendingActions] = trip.hasPendingActions
         it[accommodationName] = trip.accommodation.name
         it[accommodationPhone] = trip.accommodation.phone
         it[checkIn] = trip.accommodation.checkIn
@@ -188,30 +200,28 @@ fun createTrip(trip: Trip, userId: Int): Trip = transaction {
 
 fun findTripForUser(userId: Int): Trip? = transaction {
     Trips.selectAll().where { Trips.userId eq userId }.limit(1).map {
-            Trip(
-                id = it[Trips.id],
-                destination = it[Trips.destination],
-                startDate = it[Trips.startDate],
-                endDate = it[Trips.endDate],
-                summary = it[Trips.summary],
-                totalMembers = it[Trips.totalMembers],
-                travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
-                hasPendingActions = it[Trips.hasPendingActions],
-                accommodation = Accommodation(
-                    name = it[Trips.accommodationName],
-                    phone = it[Trips.accommodationPhone],
-                    checkIn = it[Trips.checkIn],
-                    checkOut = it[Trips.checkOut],
-                    location = it[Trips.location],
-                    mapUri = it[Trips.mapUri]
-                ),
-                reservationCode = it[Trips.reservationCode],
-                extraInfo = it[Trips.extraInfo],
-                additionalInfo = it[Trips.additionalInfo],
-                groupCode = it[Trips.groupCode],
-                ownerId = it[Trips.ownerId]
-            )
-        }.singleOrNull()
+        Trip(
+            id = it[Trips.id],
+            destination = it[Trips.destination],
+            startDate = it[Trips.startDate],
+            endDate = it[Trips.endDate],
+            summary = it[Trips.summary],
+            totalMembers = it[Trips.totalMembers],
+            accommodation = Accommodation(
+                name = it[Trips.accommodationName],
+                phone = it[Trips.accommodationPhone],
+                checkIn = it[Trips.checkIn],
+                checkOut = it[Trips.checkOut],
+                location = it[Trips.location],
+                mapUri = it[Trips.mapUri]
+            ),
+            reservationCode = it[Trips.reservationCode],
+            extraInfo = it[Trips.extraInfo],
+            additionalInfo = it[Trips.additionalInfo],
+            groupCode = it[Trips.groupCode],
+            ownerId = it[Trips.ownerId]
+        )
+    }.singleOrNull()
 }
 
 /**
@@ -224,28 +234,27 @@ fun findTripForUser(userId: Int): Trip? = transaction {
 )
 fun findAllTripsForUser(userId: Int): List<Trip> = transaction {
     Trips.selectAll().where { Trips.userId eq userId }.map {
-            Trip(
-                id = it[Trips.id],
-                destination = it[Trips.destination],
-                startDate = it[Trips.startDate],
-                endDate = it[Trips.endDate],
-                summary = it[Trips.summary],
-                totalMembers = it[Trips.totalMembers],
-                travelDirection = TravelDirection.valueOf(it[Trips.travelDirection]),
-                hasPendingActions = it[Trips.hasPendingActions],
-                accommodation = Accommodation(
-                    name = it[Trips.accommodationName],
-                    phone = it[Trips.accommodationPhone],
-                    checkIn = it[Trips.checkIn],
-                    checkOut = it[Trips.checkOut],
-                    location = it[Trips.location],
-                    mapUri = it[Trips.mapUri]
-                ),
-                reservationCode = it[Trips.reservationCode],
-                extraInfo = it[Trips.extraInfo],
-                additionalInfo = it[Trips.additionalInfo],
-                groupCode = it[Trips.groupCode],
-                ownerId = it[Trips.ownerId]
-            )
-        }
+        Trip(
+            id = it[Trips.id],
+            destination = it[Trips.destination],
+            startDate = it[Trips.startDate],
+            endDate = it[Trips.endDate],
+            summary = it[Trips.summary],
+            totalMembers = it[Trips.totalMembers],
+            accommodation = Accommodation(
+                name = it[Trips.accommodationName],
+                phone = it[Trips.accommodationPhone],
+                checkIn = it[Trips.checkIn],
+                checkOut = it[Trips.checkOut],
+                location = it[Trips.location],
+                mapUri = it[Trips.mapUri]
+            ),
+            reservationCode = it[Trips.reservationCode],
+            extraInfo = it[Trips.extraInfo],
+            additionalInfo = it[Trips.additionalInfo],
+            groupCode = it[Trips.groupCode],
+            ownerId = it[Trips.ownerId]
+        )
+    }
 }
+

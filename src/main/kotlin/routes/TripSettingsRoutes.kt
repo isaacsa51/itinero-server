@@ -93,32 +93,6 @@ fun Route.tripSettingsRoutes() {
             }
         }
 
-        // Join group by code
-        post("/groups/join") {
-            val principal = call.principal<JWTPrincipal>()
-            val email = principal?.payload?.getClaim("email")?.asString()
-
-            if (email == null) {
-                call.respondText("Unauthorized", status = HttpStatusCode.Unauthorized)
-                return@post
-            }
-
-            val user = findUserByEmail(email)
-            if (user == null) {
-                call.respondText("User not found", status = HttpStatusCode.NotFound)
-                return@post
-            }
-
-            val request = call.receive<JoinGroupRequest>()
-            val tripId = joinGroupByCode(user.id, request.groupCode)
-
-            if (tripId != null) {
-                call.respond(MemberActionResponse(true, "Join request sent. Waiting for approval."))
-            } else {
-                call.respond(MemberActionResponse(false, "Invalid group code"))
-            }
-        }
-
         // Member Management
         post("/trips/{groupCode}/members/{memberId}/accept") {
             val memberId = call.parameters["memberId"]?.toIntOrNull()

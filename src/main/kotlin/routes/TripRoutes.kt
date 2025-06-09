@@ -35,6 +35,33 @@ fun Route.tripAssociationRoutes() {
             call.respond(trips)
         }
 
+        get("/trips/{groupCode}") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+
+            if (email == null || groupCode == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@get
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@get
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@get
+            }
+
+            // Retrieve trip details by ID - assuming getTripById exists in repository
+            val tripDetails = getTripById(tripId)
+            call.respond(tripDetails ?: HttpStatusCode.NoContent)
+        }
+        
         post("/trips/{groupCode}/join") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
