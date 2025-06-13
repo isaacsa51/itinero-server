@@ -117,6 +117,7 @@ fun Route.tripAssociationRoutes() {
                     endDate = request.endDate,
                     summary = request.summary,
                     accommodation = request.accommodation,
+                    groupName = request.groupName,
                     reservationCode = request.reservationCode,
                     extraInfo = request.extraInfo,
                     additionalInfo = request.additionalInfo

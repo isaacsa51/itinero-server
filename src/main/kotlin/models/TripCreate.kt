@@ -9,6 +9,7 @@ data class CreateTripRequest(
     val endDate: String,
     val summary: String,
     val accommodation: Accommodation,
+    val groupName: String,
     val reservationCode: String,
     val extraInfo: String,
     val additionalInfo: String

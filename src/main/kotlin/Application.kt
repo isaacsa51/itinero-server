@@ -13,7 +13,6 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
-import java.util.logging.LoggingMXBean
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain.main(args)

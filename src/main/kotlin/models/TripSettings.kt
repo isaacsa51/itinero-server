@@ -38,16 +38,15 @@ data class TripMember(
 
 @Serializable
 data class UpdateTripInfoRequest(
-    val accommodationName: String,
-    val checkIn: String,
-    val checkOut: String,
-    val phone: String,
+    val groupName: String,
+    val destination: String,
+    val startDate: String,
+    val endDate: String,
+    val summary: String,
+    val accommodation: Accommodation,
     val reservationCode: String?,
-    val locationName: String,
-    val latitude: Double,
-    val longitude: Double,
-    val additionalLocationInfo: String?,
-    val generalInfo: String?
+    val extraInfo: String?,
+    val additionalInfo: String?
 )
 
 @Serializable

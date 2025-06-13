@@ -36,7 +36,8 @@ fun Route.tripSettingsRoutes() {
             val result = validateTripAccess(call, requireOwner = true) ?: return@put
 
             val request = call.receive<UpdateTripInfoRequest>()
-            if (updateTripInfo(result.tripId, request)) {
+            val groupCode = call.parameters["groupCode"]!!
+            if (updateTripInfo(groupCode, request)) {
                 call.respondText("Trip info updated successfully", status = HttpStatusCode.OK)
             } else {
                 call.respondText("Failed to update trip info", status = HttpStatusCode.InternalServerError)
@@ -165,6 +166,10 @@ private suspend fun validateTripAccess(
     val email = principal?.payload?.getClaim("email")?.asString()
     val groupCode = call.parameters["groupCode"]
 
+    println("Debug: Validating trip access")
+    println("Debug: Email = $email")
+    println("Debug: GroupCode = $groupCode")
+
     if (email == null || groupCode == null) {
         call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
         return null
@@ -176,8 +181,12 @@ private suspend fun validateTripAccess(
         return null
     }
 
+    println("Debug: User found = ${user.id}")
+
     // Find trip by group code
     val tripId = findTripByGroupCode(groupCode)
+    println("Debug: Trip ID for group code '$groupCode' = $tripId")
+
     if (tripId == null) {
         call.respondText("Trip not found", status = HttpStatusCode.NotFound)
         return null
@@ -186,6 +195,8 @@ private suspend fun validateTripAccess(
     // Check if user is member or owner
     val isOwner = isUserTripOwner(user.id, tripId)
     val isMember = isTripMember(user.id, tripId)
+
+    println("Debug: Is owner = $isOwner, Is member = $isMember")
 
     // If we require owner and user is not the owner
     if (requireOwner && !isOwner) {

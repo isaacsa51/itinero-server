@@ -15,6 +15,7 @@ data class Trip(
     val extraInfo: String? = null,
     val additionalInfo: String? = null,
     val groupCode: String,
+    val groupName: String,
     val ownerId: Int,
 )
 

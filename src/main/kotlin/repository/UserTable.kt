@@ -60,6 +60,7 @@ fun findTripsForUser(userId: Int): List<Trip> = transaction {
             Trip(
                 id = it[Trips.id],
                 destination = it[Trips.destination],
+                groupName = it[Trips.groupName],
                 startDate = it[Trips.startDate],
                 endDate = it[Trips.endDate],
                 summary = it[Trips.summary],

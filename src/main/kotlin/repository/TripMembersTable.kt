@@ -148,6 +148,7 @@ fun findMemberTrips(userId: Int): List<Trip> = transaction {
             Trip(
                 id = it[Trips.id],
                 destination = it[Trips.destination],
+                groupName = it[Trips.groupName],
                 startDate = it[Trips.startDate],
                 endDate = it[Trips.endDate],
                 summary = it[Trips.summary],
@@ -191,16 +192,22 @@ fun getTripInfoSettings(tripId: Int): TripInfoSettings? = transaction {
         }.singleOrNull()
 }
 
-fun updateTripInfo(tripId: Int, request: UpdateTripInfoRequest): Boolean = transaction {
-    Trips.update({ Trips.id eq tripId }) {
-        it[accommodationName] = request.accommodationName
-        it[checkIn] = request.checkIn
-        it[checkOut] = request.checkOut
-        it[accommodationPhone] = request.phone
+fun updateTripInfo(groupCode: String, request: UpdateTripInfoRequest): Boolean = transaction {
+    Trips.update({ Trips.groupCode eq groupCode }) {
+        it[groupName] = request.groupName
+        it[destination] = request.destination
+        it[startDate] = request.startDate
+        it[endDate] = request.endDate
+        it[summary] = request.summary
+        it[accommodationName] = request.accommodation.name
+        it[accommodationPhone] = request.accommodation.phone
+        it[checkIn] = request.accommodation.checkIn
+        it[checkOut] = request.accommodation.checkOut
+        it[location] = request.accommodation.location
+        it[mapUri] = request.accommodation.mapUri
         it[reservationCode] = request.reservationCode
-        it[location] = request.locationName
-        it[extraInfo] = request.additionalLocationInfo
-        it[additionalInfo] = request.generalInfo
+        it[extraInfo] = request.extraInfo
+        it[additionalInfo] = request.additionalInfo
     } > 0
 }
 
@@ -233,8 +240,18 @@ fun updateGroupSettings(tripId: Int, request: UpdateGroupSettingsRequest): Boole
 }
 
 fun findTripByGroupCode(groupCode: String): Int? = transaction {
-    Trips.selectAll()
+    println("Debug: Looking for trip with group code: '$groupCode'")
+
+    val result = Trips.selectAll()
         .where { Trips.groupCode eq groupCode }
         .map { it[Trips.id] }
         .singleOrNull()
+
+    println("Debug: Query result for group code '$groupCode': $result")
+
+    // Let's also check what group codes exist in the database
+    val allGroupCodes = Trips.selectAll().map { it[Trips.groupCode] }
+    println("Debug: All group codes in database: $allGroupCodes")
+
+    result
 }

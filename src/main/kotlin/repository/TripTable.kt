@@ -28,6 +28,7 @@ object Trips : Table() {
     val extraInfo = text("extra_info").nullable()
     val additionalInfo = text("additional_info").nullable()
     val groupCode = varchar("group_code", 20).uniqueIndex()
+    val groupName = varchar("group_name", 100)
     val ownerId = integer("owner_id").references(Users.id)
 
     override val primaryKey = PrimaryKey(id)
@@ -54,6 +55,7 @@ fun getTripById(tripId: Int): Trip? = transaction {
             extraInfo = row[Trips.extraInfo],
             additionalInfo = row[Trips.additionalInfo],
             groupCode = row[Trips.groupCode],
+            groupName = row[Trips.groupName],
             ownerId = row[Trips.ownerId]
         )
     }.singleOrNull()
@@ -82,6 +84,7 @@ fun getTripsForUser(userId: Int): List<Trip> = transaction {
                 extraInfo = row[Trips.extraInfo],
                 additionalInfo = row[Trips.additionalInfo],
                 groupCode = row[Trips.groupCode],
+                groupName = row[Trips.groupName],
                 ownerId = row[Trips.ownerId]
             )
         }
@@ -124,6 +127,7 @@ fun createCompleteTrip(
     endDate: String,
     summary: String,
     accommodation: Accommodation,
+    groupName: String,
     reservationCode: String? = null,
     extraInfo: String? = null,
     additionalInfo: String? = null
@@ -147,6 +151,7 @@ fun createCompleteTrip(
         it[Trips.extraInfo] = extraInfo
         it[Trips.additionalInfo] = additionalInfo
         it[Trips.groupCode] = groupCode
+        it[Trips.groupName] = groupName
         it[Trips.ownerId] = ownerId
     } get Trips.id
 
@@ -170,6 +175,7 @@ fun createCompleteTrip(
         extraInfo = extraInfo,
         additionalInfo = additionalInfo,
         groupCode = groupCode,
+        groupName = groupName,
         ownerId = ownerId
     )
 }
@@ -192,6 +198,7 @@ fun createTrip(trip: Trip, userId: Int): Trip = transaction {
         it[extraInfo] = trip.extraInfo
         it[additionalInfo] = trip.additionalInfo
         it[groupCode] = trip.groupCode
+        it[groupName] = trip.groupName
         it[ownerId] = trip.ownerId
     } get Trips.id
 
@@ -219,6 +226,7 @@ fun findTripForUser(userId: Int): Trip? = transaction {
             extraInfo = it[Trips.extraInfo],
             additionalInfo = it[Trips.additionalInfo],
             groupCode = it[Trips.groupCode],
+            groupName = it[Trips.groupName],
             ownerId = it[Trips.ownerId]
         )
     }.singleOrNull()
@@ -253,8 +261,8 @@ fun findAllTripsForUser(userId: Int): List<Trip> = transaction {
             extraInfo = it[Trips.extraInfo],
             additionalInfo = it[Trips.additionalInfo],
             groupCode = it[Trips.groupCode],
+            groupName = it[Trips.groupName],
             ownerId = it[Trips.ownerId]
         )
     }
 }
-
