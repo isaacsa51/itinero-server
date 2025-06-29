@@ -24,7 +24,8 @@ object Expenses : Table() {
 }
 
 fun createExpense(expense: CreateExpenseRequest, creatorId: Int): Expense = transaction {
-    val tripMembers = getTripMembers(expense.tripId).filter { it.isAccepted }.map { it.id }
+    val tripMembers =
+        getTripMembers(expense.tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }.map { it.id }
 
     if (!tripMembers.contains(expense.paidByUserId) || expense.debtors.any { !tripMembers.contains(it.userId) }) {
         throw IllegalArgumentException("All users must be trip members")
@@ -79,9 +80,9 @@ fun createExpense(expense: CreateExpenseRequest, creatorId: Int): Expense = tran
         val debtorAmount = debtorAmounts[debtor.userId] ?: 0.0
         val debtorId = ExpenseDebtors.insert {
             it[ExpenseDebtors.expenseId] = expenseId
-            it[userId] = debtor.userId
-            it[amount] = debtorAmount.toBigDecimal()
-            it[splitValue] = debtor.splitValue
+            it[ExpenseDebtors.userId] = debtor.userId
+            it[ExpenseDebtors.amount] = debtorAmount.toBigDecimal()
+            it[ExpenseDebtors.splitValue] = debtor.splitValue
         } get ExpenseDebtors.id
 
         ExpenseDebtor(
@@ -150,7 +151,7 @@ fun markExpenseAsCompleted(expenseId: Int, userId: Int): Boolean = transaction {
     }
 
     Expenses.update({ Expenses.id eq expenseId }) {
-        it[isCompleted] = true
+        it[Expenses.isCompleted] = true
     } > 0
 }
 
@@ -170,7 +171,7 @@ fun deleteExpense(expenseId: Int, userId: Int): Boolean = transaction {
 
 fun getExpenseSummary(tripId: Int): ExpenseSummary = transaction {
     val expenses = getTripExpenses(tripId)
-    val members = getTripMembers(tripId).filter { it.isAccepted }
+    val members = getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }
 
     val amountPaid = expenses.groupBy { it.paidByUserId }.mapValues { (_, expenses) -> expenses.sumOf { it.amount } }
 

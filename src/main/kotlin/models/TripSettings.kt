@@ -32,8 +32,7 @@ data class TripMember(
     val id: Int,
     val name: String,
     val email: String,
-    val isAccepted: Boolean,
-    val isPending: Boolean
+    val status: String // "OWNER", "ACCEPTED", "PENDING"
 )
 
 @Serializable

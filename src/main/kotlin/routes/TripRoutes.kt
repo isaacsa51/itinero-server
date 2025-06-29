@@ -57,11 +57,168 @@ fun Route.tripAssociationRoutes() {
                 return@get
             }
 
-            // Retrieve trip details by ID - assuming getTripById exists in repository
             val tripDetails = getTripById(tripId)
             call.respond(tripDetails ?: HttpStatusCode.NoContent)
         }
-        
+
+        get("/trips/{groupCode}/members") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+
+            if (email == null || groupCode == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@get
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@get
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@get
+            }
+
+            // Check if user is trip owner
+            if (!isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip owner can view trip members")
+                return@get
+            }
+
+            val allMembers = getTripMembers(tripId)
+            call.respond(allMembers)
+        }
+
+        // Accept a pending member
+        post("/trips/{groupCode}/members/{memberId}/accept") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+            val memberId = call.parameters["memberId"]?.toIntOrNull()
+
+            if (email == null || groupCode == null || memberId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@post
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@post
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@post
+            }
+
+            // Check if user is trip owner
+            if (!isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip owner can accept members")
+                return@post
+            }
+
+            val success = acceptTripMember(memberId, tripId)
+            if (success) {
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Member accepted successfully"))
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to accept member"))
+            }
+        }
+
+        // Remove/reject a member
+        delete("/trips/{groupCode}/members/{memberId}") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+            val memberId = call.parameters["memberId"]?.toIntOrNull()
+
+            if (email == null || groupCode == null || memberId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@delete
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@delete
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@delete
+            }
+
+            // Check if user is trip owner
+            if (!isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip owner can remove members")
+                return@delete
+            }
+
+            // Don't allow owner to remove themselves
+            if (memberId == user.id) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Owner cannot remove themselves"))
+                return@delete
+            }
+
+            val success = rejectTripMember(memberId, tripId)
+            if (success) {
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Member removed successfully"))
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to remove member"))
+            }
+        }
+
+        // Make a member the new owner
+        post("/trips/{groupCode}/members/{memberId}/make-owner") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+            val memberId = call.parameters["memberId"]?.toIntOrNull()
+
+            if (email == null || groupCode == null || memberId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@post
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@post
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@post
+            }
+
+            // Check if user is trip owner
+            if (!isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip owner can transfer ownership")
+                return@post
+            }
+
+            // Check if the target member is accepted (not pending)
+            if (!isTripMember(memberId, tripId)) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Cannot make pending member an owner"))
+                return@post
+            }
+
+            val success = transferTripOwnership(tripId, memberId)
+            if (success) {
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Ownership transferred successfully"))
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to transfer ownership"))
+            }
+        }
+
         post("/trips/{groupCode}/join") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()

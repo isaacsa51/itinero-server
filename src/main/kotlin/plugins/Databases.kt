@@ -1,5 +1,6 @@
 package com.serranoie.server.plugins
 
+import com.serranoie.server.repository.ItineraryItems
 import com.serranoie.server.repository.TripInfoTable
 import com.serranoie.server.repository.TripMembers
 import com.serranoie.server.repository.Trips
@@ -20,6 +21,6 @@ fun configureDatabases() {
     org.h2.tools.Server.createWebServer("-web", "-webAllowOthers", "-webPort", "8082").start()
 
     transaction {
-        SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable)
+        SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable, ItineraryItems)
     }
 }

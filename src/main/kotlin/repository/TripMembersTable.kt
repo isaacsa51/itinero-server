@@ -26,6 +26,7 @@ fun addMemberToTrip(userId: Int, tripId: Int) = transaction {
             it[isAccepted] = false
             it[isPending] = true
         }
+        updateTotalMembers(tripId)
         return@transaction true
     }
     return@transaction false
@@ -48,6 +49,8 @@ fun inviteMemberByEmail(email: String, tripId: Int): Boolean = transaction {
         it[isAccepted] = false
         it[isPending] = true
     }
+
+    updateTotalMembers(tripId)
 
     return@transaction true
 }
@@ -74,48 +77,92 @@ fun joinGroupByCode(userId: Int, groupCode: String): Int? = transaction {
         it[isPending] = true
     }
 
+    updateTotalMembers(tripId)
+
     return@transaction tripId
 }
 
 fun getTripMembers(tripId: Int): List<TripMember> = transaction {
+    val trip = Trips.selectAll().where { Trips.id eq tripId }.singleOrNull()
+    val ownerId = trip?.get(Trips.ownerId)
+
     (TripMembers innerJoin Users)
         .selectAll()
         .where { TripMembers.tripId eq tripId }
         .map {
+            val userId = it[Users.id]
+            val status = when {
+                userId == ownerId -> "OWNER"
+                it[TripMembers.isAccepted] -> "ACCEPTED"
+                it[TripMembers.isPending] -> "PENDING"
+                else -> "UNKNOWN"
+            }
+
             TripMember(
-                id = it[Users.id],
+                id = userId,
                 name = "${it[Users.name]} ${it[Users.surname]}",
                 email = it[Users.email],
-                isAccepted = it[TripMembers.isAccepted],
-                isPending = it[TripMembers.isPending]
+                status = status
             )
         }
 }
 
 fun getPendingMembers(tripId: Int): List<TripMember> = transaction {
+    val trip = Trips.selectAll().where { Trips.id eq tripId }.singleOrNull()
+    val ownerId = trip?.get(Trips.ownerId)
+
     (TripMembers innerJoin Users)
         .selectAll()
         .where { (TripMembers.tripId eq tripId) and (TripMembers.isPending eq true) }
         .map {
+            val userId = it[Users.id]
+            val status = when {
+                userId == ownerId -> "OWNER"
+                it[TripMembers.isAccepted] -> "ACCEPTED"
+                it[TripMembers.isPending] -> "PENDING"
+                else -> "UNKNOWN"
+            }
+
             TripMember(
-                id = it[Users.id],
+                id = userId,
                 name = "${it[Users.name]} ${it[Users.surname]}",
                 email = it[Users.email],
-                isAccepted = it[TripMembers.isAccepted],
-                isPending = it[TripMembers.isPending]
+                status = status
             )
         }
 }
 
+fun updateTotalMembers(tripId: Int) = transaction {
+    val acceptedMembersCount = TripMembers.selectAll()
+        .where { (TripMembers.tripId eq tripId) and (TripMembers.isAccepted eq true) }
+        .count()
+
+    Trips.update({ Trips.id eq tripId }) {
+        it[totalMembers] = acceptedMembersCount.toInt()
+    }
+}
+
 fun acceptTripMember(userId: Int, tripId: Int): Boolean = transaction {
-    TripMembers.update({ (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) }) {
+    val updated = TripMembers.update({ (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) }) {
         it[isAccepted] = true
         it[isPending] = false
     } > 0
+
+    if (updated) {
+        updateTotalMembers(tripId)
+    }
+
+    updated
 }
 
 fun rejectTripMember(userId: Int, tripId: Int): Boolean = transaction {
-    TripMembers.deleteWhere { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) } > 0
+    val deleted = TripMembers.deleteWhere { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) } > 0
+
+    if (deleted) {
+        updateTotalMembers(tripId)
+    }
+
+    deleted
 }
 
 fun isUserTripOwner(userId: Int, tripId: Int): Boolean = transaction {
@@ -131,7 +178,13 @@ fun isTripMember(userId: Int, tripId: Int): Boolean = transaction {
 }
 
 fun leaveTrip(userId: Int, tripId: Int): Boolean = transaction {
-    TripMembers.deleteWhere { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) } > 0
+    val deleted = TripMembers.deleteWhere { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) } > 0
+
+    if (deleted) {
+        updateTotalMembers(tripId)
+    }
+
+    deleted
 }
 
 fun deleteTrip(tripId: Int) = transaction {
@@ -171,25 +224,33 @@ fun findMemberTrips(userId: Int): List<Trip> = transaction {
 }
 
 fun getTripInfoSettings(tripId: Int): TripInfoSettings? = transaction {
-    Trips.selectAll()
+    val trip = Trips.selectAll()
         .where { Trips.id eq tripId }
-        .map {
-            TripInfoSettings(
-                id = it[Trips.id],
-                accommodationName = it[Trips.accommodationName],
-                checkIn = it[Trips.checkIn],
-                checkOut = it[Trips.checkOut],
-                phone = it[Trips.accommodationPhone],
-                reservationCode = it[Trips.reservationCode],
-                location = Location(
-                    name = it[Trips.location],
-                    latitude = 0.0,
-                    longitude = 0.0
-                ),
-                additionalLocationInfo = it[Trips.extraInfo],
-                generalInfo = it[Trips.additionalInfo]
-            )
-        }.singleOrNull()
+        .singleOrNull() ?: return@transaction null
+
+    TripInfoSettings(
+        id = trip[Trips.id],
+        accommodationName = trip[Trips.accommodationName],
+        checkIn = trip[Trips.checkIn],
+        checkOut = trip[Trips.checkOut],
+        phone = trip[Trips.accommodationPhone],
+        reservationCode = trip[Trips.reservationCode],
+        location = Location(
+            name = trip[Trips.location],
+            latitude = 0.0,
+            longitude = 0.0
+        ),
+        additionalLocationInfo = trip[Trips.extraInfo],
+        generalInfo = trip[Trips.additionalInfo]
+    )
+}
+
+fun transferTripOwnership(tripId: Int, newOwnerId: Int): Boolean = transaction {
+    val updated = Trips.update({ Trips.id eq tripId }) {
+        it[ownerId] = newOwnerId
+    } > 0
+
+    updated
 }
 
 fun updateTripInfo(groupCode: String, request: UpdateTripInfoRequest): Boolean = transaction {
@@ -240,18 +301,10 @@ fun updateGroupSettings(tripId: Int, request: UpdateGroupSettingsRequest): Boole
 }
 
 fun findTripByGroupCode(groupCode: String): Int? = transaction {
-    println("Debug: Looking for trip with group code: '$groupCode'")
-
     val result = Trips.selectAll()
         .where { Trips.groupCode eq groupCode }
         .map { it[Trips.id] }
         .singleOrNull()
 
-    println("Debug: Query result for group code '$groupCode': $result")
-
-    // Let's also check what group codes exist in the database
-    val allGroupCodes = Trips.selectAll().map { it[Trips.groupCode] }
-    println("Debug: All group codes in database: $allGroupCodes")
-
-    result
+    return@transaction result
 }

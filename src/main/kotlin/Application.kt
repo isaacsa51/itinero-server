@@ -3,6 +3,7 @@ package com.serranoie.server
 import com.serranoie.server.plugins.configureDatabases
 import com.serranoie.server.routes.authRoutes
 import com.serranoie.server.routes.expenseRoutes
+import com.serranoie.server.routes.itineraryRoutes
 import com.serranoie.server.routes.tripAssociationRoutes
 import com.serranoie.server.routes.tripSettingsRoutes
 import com.serranoie.server.security.JwtConfig
@@ -51,6 +52,9 @@ fun Application.module() {
             
             // Expense management endpoints
             expenseRoutes()
+
+            // Itinerary management endpoints
+            itineraryRoutes()
         }
     }
 }
