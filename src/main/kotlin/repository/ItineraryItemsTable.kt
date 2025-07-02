@@ -36,20 +36,39 @@ fun createItineraryItem(
         it[isCompleted] = false
     } get ItineraryItems.id
 
-    ItineraryItem(
-        id = itemId,
-        groupCode = groupCode,
-        name = name,
-        description = description,
-        date = date,
-        time = time,
-        location = location,
-        isCompleted = false
-    )
+    try {
+        val itemId = ItineraryItems.insert {
+            it[ItineraryItems.groupCode] = groupCode
+            it[ItineraryItems.name] = name
+            it[ItineraryItems.description] = description
+            it[ItineraryItems.date] = date
+            it[ItineraryItems.time] = time
+            it[ItineraryItems.location] = location
+            it[isCompleted] = false
+        } get ItineraryItems.id
+
+        val result = ItineraryItem(
+            id = itemId,
+            groupCode = groupCode,
+            name = name,
+            description = description,
+            date = date,
+            time = time,
+            location = location,
+            isCompleted = false
+        )
+        return@transaction result
+
+    } catch (e: Exception) {
+        println("ERROR during database insert: ${e.message}")
+        println("Exception type: ${e::class.simpleName}")
+        e.printStackTrace()
+        throw e
+    }
 }
 
 fun getItineraryItemsByGroupCode(groupCode: String): List<ItineraryItem> = transaction {
-    ItineraryItems.selectAll().where { ItineraryItems.groupCode eq groupCode }
+    val items = ItineraryItems.selectAll().where { ItineraryItems.groupCode eq groupCode }
         .orderBy(ItineraryItems.date to SortOrder.ASC, ItineraryItems.time to SortOrder.ASC)
         .map { row ->
             ItineraryItem(
@@ -63,6 +82,7 @@ fun getItineraryItemsByGroupCode(groupCode: String): List<ItineraryItem> = trans
                 isCompleted = row[ItineraryItems.isCompleted]
             )
         }
+    return@transaction items
 }
 
 fun getItineraryItemById(itemId: Int): ItineraryItem? = transaction {
