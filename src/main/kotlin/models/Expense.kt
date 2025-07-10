@@ -16,7 +16,7 @@ data class Expense(
     val notes: String? = null,
     val isCompleted: Boolean = false,
     val debtors: List<ExpenseDebtor> = emptyList(),
-    val paidBy: UserBasic? = null  // Populated when fetching
+    val paidBy: UserBasic? = null
 )
 
 @Serializable
@@ -30,7 +30,7 @@ data class ExpenseDebtor(
     val userId: Int,
     val amount: Double,
     val splitValue: Double,
-    val user: UserBasic? = null  // Populated when fetching
+    val user: UserBasic? = null
 )
 
 @Serializable
@@ -42,7 +42,6 @@ data class UserBasic(
 
 @Serializable
 data class CreateExpenseRequest(
-    val tripId: Int,
     val name: String,
     val amount: Double,
     val date: String,
@@ -57,7 +56,20 @@ data class CreateExpenseRequest(
 @Serializable
 data class CreateDebtorRequest(
     val userId: Int,
-    val splitValue: Double  // Percentage or proportion value
+    val splitValue: Double
+)
+
+@Serializable
+data class UpdateExpenseRequest(
+    val name: String? = null,
+    val amount: Double? = null,
+    val date: String? = null,
+    val category: String? = null,
+    val paidByUserId: Int? = null,
+    val paymentMethod: String? = null,
+    val splitType: SplitType? = null,
+    val notes: String? = null,
+    val debtors: List<CreateDebtorRequest>? = null
 )
 
 @Serializable
@@ -72,5 +84,14 @@ data class ExpenseSummary(
 data class UserBalance(
     val userId: Int,
     val name: String,
-    val balance: Double  // Positive if they're owed money, negative if they owe
+    val balance: Double
+)
+
+@Serializable
+data class UserExpenseSummary(
+    val totalTripExpenses: Double,
+    val userAmountOwed: Double,
+    val userAmountToReceive: Double,
+    val userBalance: Double,
+    val expenses: List<Expense>
 )

@@ -23,9 +23,9 @@ object Expenses : Table() {
     override val primaryKey = PrimaryKey(id)
 }
 
-fun createExpense(expense: CreateExpenseRequest, creatorId: Int): Expense = transaction {
+fun createExpense(expense: CreateExpenseRequest, tripId: Int, creatorId: Int): Expense = transaction {
     val tripMembers =
-        getTripMembers(expense.tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }.map { it.id }
+        getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }.map { it.id }
 
     if (!tripMembers.contains(expense.paidByUserId) || expense.debtors.any { !tripMembers.contains(it.userId) }) {
         throw IllegalArgumentException("All users must be trip members")
@@ -63,7 +63,7 @@ fun createExpense(expense: CreateExpenseRequest, creatorId: Int): Expense = tran
     }
 
     val expenseId = Expenses.insert {
-        it[tripId] = expense.tripId
+        it[Expenses.tripId] = tripId
         it[name] = expense.name
         it[amount] = expense.amount.toBigDecimal()
         it[date] = expense.date
@@ -92,7 +92,7 @@ fun createExpense(expense: CreateExpenseRequest, creatorId: Int): Expense = tran
 
     return@transaction Expense(
         id = expenseId,
-        tripId = expense.tripId,
+        tripId = tripId,
         name = expense.name,
         amount = expense.amount,
         date = expense.date,
@@ -197,4 +197,117 @@ fun getExpenseSummary(tripId: Int): ExpenseSummary = transaction {
         totalPaid = amountPaid.values.sum(),
         balances = balances
     )
+}
+
+fun getUserExpenseSummary(tripId: Int, currentUserId: Int): UserExpenseSummary = transaction {
+    val expenses = getTripExpenses(tripId)
+    val members = getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }
+
+    // Calculate how much current user paid
+    val userPaid = expenses.filter { it.paidByUserId == currentUserId }.sumOf { it.amount }
+
+    // Calculate how much current user owes (their share of all expenses)
+    val userOwes = expenses.sumOf { expense ->
+        expense.debtors.find { it.userId == currentUserId }?.amount ?: 0.0
+    }
+
+    // Net balance: positive means user is owed money, negative means user owes money
+    val userBalance = userPaid - userOwes
+
+    // Calculate amounts for UI display
+    val userAmountOwed = if (userBalance < 0) kotlin.math.abs(userBalance) else 0.0
+    val userAmountToReceive = if (userBalance > 0) userBalance else 0.0
+
+    UserExpenseSummary(
+        totalTripExpenses = expenses.sumOf { it.amount },
+        userAmountOwed = userAmountOwed,
+        userAmountToReceive = userAmountToReceive,
+        userBalance = userBalance,
+        expenses = expenses.sortedByDescending { it.date } // Most recent first
+    )
+}
+
+fun updateExpense(expenseId: Int, updateRequest: UpdateExpenseRequest, userId: Int): Expense? = transaction {
+    // First, get the existing expense
+    val existingExpense = Expenses.selectAll().where { Expenses.id eq expenseId }.singleOrNull()
+        ?: return@transaction null
+
+    // Check if user has permission to update (must be payer or trip owner)
+    val tripId = existingExpense[Expenses.tripId]
+    if (existingExpense[Expenses.paidByUserId] != userId && !isUserTripOwner(userId, tripId)) {
+        return@transaction null
+    }
+
+    // Prepare values for update (use existing values if not provided)
+    val newAmount = updateRequest.amount ?: existingExpense[Expenses.amount].toDouble()
+    val newSplitType = updateRequest.splitType ?: SplitType.valueOf(existingExpense[Expenses.splitType])
+    val newDebtors = updateRequest.debtors
+    val newPaidByUserId = updateRequest.paidByUserId ?: existingExpense[Expenses.paidByUserId]
+
+    // If amount, splitType, debtors, or paidByUserId changed, need to recalculate debtor amounts
+    val needsRecalculation = updateRequest.amount != null ||
+            updateRequest.splitType != null ||
+            updateRequest.debtors != null ||
+            updateRequest.paidByUserId != null
+
+    if (needsRecalculation && newDebtors != null) {
+        // Validate that all users are trip members
+        val tripMembers =
+            getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }.map { it.id }
+        if (!tripMembers.contains(newPaidByUserId) || newDebtors.any { !tripMembers.contains(it.userId) }) {
+            throw IllegalArgumentException("All users must be trip members")
+        }
+
+        // Calculate new debtor amounts
+        val debtorAmounts = when (newSplitType) {
+            SplitType.EQUAL -> {
+                val perPerson = newAmount / newDebtors.size
+                newDebtors.associate { it.userId to perPerson }
+            }
+
+            SplitType.PERCENTAGE -> {
+                val totalPercentage = newDebtors.sumOf { it.splitValue }
+                if (abs(totalPercentage - 100.0) > 0.01) {
+                    throw IllegalArgumentException("Percentages must add up to 100%")
+                }
+                newDebtors.associate { it.userId to (newAmount * it.splitValue / 100.0) }
+            }
+
+            SplitType.CUSTOM -> {
+                val totalCustom = newDebtors.sumOf { it.splitValue }
+                if (abs(totalCustom - newAmount) > 0.01) {
+                    throw IllegalArgumentException("Custom amounts must add up to total")
+                }
+                newDebtors.associate { it.userId to it.splitValue }
+            }
+        }
+
+        // Delete existing debtors and create new ones
+        ExpenseDebtors.deleteWhere { ExpenseDebtors.expenseId eq expenseId }
+
+        newDebtors.forEach { debtor ->
+            val debtorAmount = debtorAmounts[debtor.userId] ?: 0.0
+            ExpenseDebtors.insert {
+                it[ExpenseDebtors.expenseId] = expenseId
+                it[ExpenseDebtors.userId] = debtor.userId
+                it[ExpenseDebtors.amount] = debtorAmount.toBigDecimal()
+                it[ExpenseDebtors.splitValue] = debtor.splitValue
+            }
+        }
+    }
+
+    // Update the expense table
+    Expenses.update({ Expenses.id eq expenseId }) {
+        updateRequest.name?.let { name -> it[Expenses.name] = name }
+        updateRequest.amount?.let { amount -> it[Expenses.amount] = amount.toBigDecimal() }
+        updateRequest.date?.let { date -> it[Expenses.date] = date }
+        updateRequest.category?.let { category -> it[Expenses.category] = category }
+        updateRequest.paidByUserId?.let { paidBy -> it[Expenses.paidByUserId] = paidBy }
+        updateRequest.paymentMethod?.let { method -> it[Expenses.paymentMethod] = method }
+        updateRequest.splitType?.let { split -> it[Expenses.splitType] = split.name }
+        updateRequest.notes?.let { notes -> it[Expenses.notes] = notes }
+    }
+
+    // Return the updated expense
+    return@transaction getTripExpenses(tripId).find { it.id == expenseId }
 }

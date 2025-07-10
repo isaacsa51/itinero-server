@@ -1,11 +1,7 @@
 package com.serranoie.server.plugins
 
-import com.serranoie.server.repository.ItineraryItems
-import com.serranoie.server.repository.TripInfoTable
-import com.serranoie.server.repository.TripMembers
-import com.serranoie.server.repository.Trips
-import com.serranoie.server.repository.UserTrips
-import com.serranoie.server.repository.Users
+import com.serranoie.server.models.Expense
+import com.serranoie.server.repository.*
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -21,6 +17,7 @@ fun configureDatabases() {
     org.h2.tools.Server.createWebServer("-web", "-webAllowOthers", "-webPort", "8082").start()
 
     transaction {
-        SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable, ItineraryItems)
+        SchemaUtils.create(Users, Trips, UserTrips, TripMembers, TripInfoTable, ItineraryItems, Expenses,
+            ExpenseDebtors)
     }
 }
