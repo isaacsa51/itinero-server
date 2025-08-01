@@ -26,16 +26,6 @@ fun createItineraryItem(
     time: String,
     location: String
 ): ItineraryItem = transaction {
-    val itemId = ItineraryItems.insert {
-        it[ItineraryItems.groupCode] = groupCode
-        it[ItineraryItems.name] = name
-        it[ItineraryItems.description] = description
-        it[ItineraryItems.date] = date
-        it[ItineraryItems.time] = time
-        it[ItineraryItems.location] = location
-        it[isCompleted] = false
-    } get ItineraryItems.id
-
     try {
         val itemId = ItineraryItems.insert {
             it[ItineraryItems.groupCode] = groupCode
@@ -70,6 +60,25 @@ fun createItineraryItem(
 fun getItineraryItemsByGroupCode(groupCode: String): List<ItineraryItem> = transaction {
     val items = ItineraryItems.selectAll().where { ItineraryItems.groupCode eq groupCode }
         .orderBy(ItineraryItems.date to SortOrder.ASC, ItineraryItems.time to SortOrder.ASC)
+        .map { row ->
+            ItineraryItem(
+                id = row[ItineraryItems.id],
+                groupCode = row[ItineraryItems.groupCode],
+                name = row[ItineraryItems.name],
+                description = row[ItineraryItems.description],
+                date = row[ItineraryItems.date],
+                time = row[ItineraryItems.time],
+                location = row[ItineraryItems.location],
+                isCompleted = row[ItineraryItems.isCompleted]
+            )
+        }
+    return@transaction items
+}
+
+fun getItineraryItemsByGroupCodeAndDate(groupCode: String, targetDate: String): List<ItineraryItem> = transaction {
+    val items = ItineraryItems.selectAll()
+        .where { (ItineraryItems.groupCode eq groupCode) and (ItineraryItems.date eq targetDate) }
+        .orderBy(ItineraryItems.time to SortOrder.ASC)
         .map { row ->
             ItineraryItem(
                 id = row[ItineraryItems.id],

@@ -90,6 +90,52 @@ fun Route.expenseRoutes() {
             call.respond(expenses)
         }
 
+        get("/trips/{groupCode}/expenses/{expenseId}") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+                ?: return@get call.respondText(
+                    "Unauthorized", status = HttpStatusCode.Unauthorized
+                )
+
+            val user = findUserByEmail(email)
+                ?: return@get call.respondText(
+                    "User not found", status = HttpStatusCode.NotFound
+                )
+
+            val groupCode = call.parameters["groupCode"]
+                ?: return@get call.respondText(
+                    "Invalid group code", status = HttpStatusCode.BadRequest
+                )
+
+            val expenseId = call.parameters["expenseId"]?.toIntOrNull()
+                ?: return@get call.respondText(
+                    "Invalid expense ID", status = HttpStatusCode.BadRequest
+                )
+
+            val tripId = findTripByGroupCode(groupCode)
+                ?: return@get call.respondText(
+                    "Trip not found", status = HttpStatusCode.NotFound
+                )
+
+            // Verify user is a trip member
+            if (!isTripMember(user.id, tripId) && !isUserTripOwner(user.id, tripId)) {
+                call.respondText(
+                    "You must be a trip member to view expenses",
+                    status = HttpStatusCode.Forbidden
+                )
+                return@get
+            }
+
+            val expense = getExpenseById(expenseId, tripId)
+            if (expense != null) {
+                call.respond(expense)
+            } else {
+                call.respondText(
+                    "Expense not found", status = HttpStatusCode.NotFound
+                )
+            }
+        }
+
         get("/trips/{groupCode}/expenses/summary") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -197,11 +243,118 @@ fun Route.expenseRoutes() {
             }
 
             if (markExpenseAsCompleted(expenseId, user.id)) {
-                call.respondText("Expense marked as completed", status = HttpStatusCode.OK)
+                val updatedExpense = getExpenseById(expenseId, tripId)
+                if (updatedExpense != null) {
+                    call.respond(updatedExpense)
+                } else {
+                    call.respondText("Expense not found", status = HttpStatusCode.NotFound)
+                }
             } else {
                 call.respondText(
                     "Failed to mark expense as completed. You might not be the payer.",
                     status = HttpStatusCode.Forbidden
+                )
+            }
+        }
+
+        patch("/trips/{groupCode}/expenses/{expenseId}/paid") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+                ?: return@patch call.respondText(
+                    "Unauthorized", status = HttpStatusCode.Unauthorized
+                )
+
+            val user = findUserByEmail(email)
+                ?: return@patch call.respondText(
+                    "User not found", status = HttpStatusCode.NotFound
+                )
+
+            val groupCode = call.parameters["groupCode"]
+                ?: return@patch call.respondText(
+                    "Invalid group code", status = HttpStatusCode.BadRequest
+                )
+
+            val expenseId = call.parameters["expenseId"]?.toIntOrNull()
+                ?: return@patch call.respondText(
+                    "Invalid expense ID", status = HttpStatusCode.BadRequest
+                )
+
+            val tripId = findTripByGroupCode(groupCode)
+                ?: return@patch call.respondText(
+                    "Trip not found", status = HttpStatusCode.NotFound
+                )
+
+            // Verify user is a trip member
+            if (!isTripMember(user.id, tripId) && !isUserTripOwner(user.id, tripId)) {
+                call.respondText(
+                    "You must be a trip member to mark payments",
+                    status = HttpStatusCode.Forbidden
+                )
+                return@patch
+            }
+
+            if (markDebtorAsPaid(expenseId, user.id)) {
+                val updatedExpense = getExpenseById(expenseId, tripId)
+                if (updatedExpense != null) {
+                    call.respond(updatedExpense)
+                } else {
+                    call.respondText("Expense not found", status = HttpStatusCode.NotFound)
+                }
+            } else {
+                call.respondText(
+                    "Failed to mark payment as paid. You might not be a debtor for this expense.",
+                    status = HttpStatusCode.BadRequest
+                )
+            }
+        }
+
+        patch("/trips/{groupCode}/expenses/{expenseId}/unpaid") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+                ?: return@patch call.respondText(
+                    "Unauthorized", status = HttpStatusCode.Unauthorized
+                )
+
+            val user = findUserByEmail(email)
+                ?: return@patch call.respondText(
+                    "User not found", status = HttpStatusCode.NotFound
+                )
+
+            val groupCode = call.parameters["groupCode"]
+                ?: return@patch call.respondText(
+                    "Invalid group code", status = HttpStatusCode.BadRequest
+                )
+
+            val expenseId = call.parameters["expenseId"]?.toIntOrNull()
+                ?: return@patch call.respondText(
+                    "Invalid expense ID", status = HttpStatusCode.BadRequest
+                )
+
+            val tripId = findTripByGroupCode(groupCode)
+                ?: return@patch call.respondText(
+                    "Trip not found", status = HttpStatusCode.NotFound
+                )
+
+            // Verify user is a trip member
+            if (!isTripMember(user.id, tripId) && !isUserTripOwner(user.id, tripId)) {
+                call.respondText(
+                    "You must be a trip member to mark payments",
+                    status = HttpStatusCode.Forbidden
+                )
+                return@patch
+            }
+
+            if (markDebtorAsUnpaid(expenseId, user.id)) {
+                val updatedExpense = getExpenseById(expenseId, tripId)
+                if (updatedExpense != null) {
+                    call.respond(updatedExpense)
+                } else {
+                    call.respondText("Expense not found", status = HttpStatusCode.NotFound)
+                }
+            } else {
+                call.respondText(
+                    "Failed to mark payment as unpaid. You might not be a debtor for this expense.",
+                    status = HttpStatusCode.BadRequest
                 )
             }
         }
@@ -299,7 +452,7 @@ fun Route.expenseRoutes() {
             }
 
             if (deleteExpense(expenseId, user.id)) {
-                call.respondText("Expense deleted successfully", status = HttpStatusCode.OK)
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Expense deleted successfully"))
             } else {
                 call.respondText(
                     "Failed to delete expense. You might not be the payer or trip owner.",

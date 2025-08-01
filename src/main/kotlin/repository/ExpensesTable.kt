@@ -23,6 +23,49 @@ object Expenses : Table() {
     override val primaryKey = PrimaryKey(id)
 }
 
+fun getExpenseById(expenseId: Int, tripId: Int): Expense? = transaction {
+    val expenseRow = (Expenses innerJoin Users).selectAll()
+        .where { (Expenses.id eq expenseId) and (Expenses.tripId eq tripId) }
+        .singleOrNull() ?: return@transaction null
+
+    val debtors = (ExpenseDebtors innerJoin Users).selectAll()
+        .where { ExpenseDebtors.expenseId eq expenseId }
+        .map { debtorRow ->
+            ExpenseDebtor(
+                id = debtorRow[ExpenseDebtors.id],
+                userId = debtorRow[ExpenseDebtors.userId],
+                amount = debtorRow[ExpenseDebtors.amount].toDouble(),
+                splitValue = debtorRow[ExpenseDebtors.splitValue],
+                hasPaid = debtorRow[ExpenseDebtors.hasPaid],
+                user = UserBasic(
+                    id = debtorRow[Users.id],
+                    name = debtorRow[Users.name],
+                    surname = debtorRow[Users.surname]
+                )
+            )
+        }
+
+    Expense(
+        id = expenseRow[Expenses.id],
+        tripId = expenseRow[Expenses.tripId],
+        name = expenseRow[Expenses.name],
+        amount = expenseRow[Expenses.amount].toDouble(),
+        date = expenseRow[Expenses.date],
+        category = expenseRow[Expenses.category],
+        paidByUserId = expenseRow[Expenses.paidByUserId],
+        paymentMethod = expenseRow[Expenses.paymentMethod],
+        splitType = SplitType.valueOf(expenseRow[Expenses.splitType]),
+        notes = expenseRow[Expenses.notes],
+        isCompleted = expenseRow[Expenses.isCompleted],
+        debtors = debtors,
+        paidBy = UserBasic(
+            id = expenseRow[Users.id],
+            name = expenseRow[Users.name],
+            surname = expenseRow[Users.surname]
+        )
+    )
+}
+
 fun createExpense(expense: CreateExpenseRequest, tripId: Int, creatorId: Int): Expense = transaction {
     val tripMembers =
         getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }.map { it.id }
@@ -78,15 +121,40 @@ fun createExpense(expense: CreateExpenseRequest, tripId: Int, creatorId: Int): E
 
     val debtors = expense.debtors.map { debtor ->
         val debtorAmount = debtorAmounts[debtor.userId] ?: 0.0
+        val isCreatorPayer = debtor.userId == expense.paidByUserId
         val debtorId = ExpenseDebtors.insert {
             it[ExpenseDebtors.expenseId] = expenseId
             it[ExpenseDebtors.userId] = debtor.userId
             it[ExpenseDebtors.amount] = debtorAmount.toBigDecimal()
             it[ExpenseDebtors.splitValue] = debtor.splitValue
+            it[ExpenseDebtors.hasPaid] = isCreatorPayer
         } get ExpenseDebtors.id
 
+        // Get user information for the debtor
+        val userInfo = (Users.selectAll().where { Users.id eq debtor.userId }.singleOrNull())?.let {
+            UserBasic(
+                id = it[Users.id],
+                name = it[Users.name],
+                surname = it[Users.surname]
+            )
+        }
+
         ExpenseDebtor(
-            id = debtorId, userId = debtor.userId, amount = debtorAmount, splitValue = debtor.splitValue
+            id = debtorId,
+            userId = debtor.userId,
+            amount = debtorAmount,
+            splitValue = debtor.splitValue,
+            hasPaid = isCreatorPayer,
+            user = userInfo
+        )
+    }
+
+    // Get paidBy user information
+    val paidByUser = (Users.selectAll().where { Users.id eq expense.paidByUserId }.singleOrNull())?.let {
+        UserBasic(
+            id = it[Users.id],
+            name = it[Users.name],
+            surname = it[Users.surname]
         )
     }
 
@@ -101,7 +169,9 @@ fun createExpense(expense: CreateExpenseRequest, tripId: Int, creatorId: Int): E
         paymentMethod = expense.paymentMethod,
         splitType = expense.splitType,
         notes = expense.notes,
-        debtors = debtors
+        isCompleted = false,
+        debtors = debtors,
+        paidBy = paidByUser
     )
 }
 
@@ -117,6 +187,47 @@ fun getTripExpenses(tripId: Int): List<Expense> = transaction {
                         userId = debtorRow[ExpenseDebtors.userId],
                         amount = debtorRow[ExpenseDebtors.amount].toDouble(),
                         splitValue = debtorRow[ExpenseDebtors.splitValue],
+                        hasPaid = debtorRow[ExpenseDebtors.hasPaid],
+                        user = UserBasic(
+                            id = debtorRow[Users.id], name = debtorRow[Users.name], surname = debtorRow[Users.surname]
+                        )
+                    )
+                }
+
+            Expense(
+                id = expenseId,
+                tripId = expenseRow[Expenses.tripId],
+                name = expenseRow[Expenses.name],
+                amount = expenseRow[Expenses.amount].toDouble(),
+                date = expenseRow[Expenses.date],
+                category = expenseRow[Expenses.category],
+                paidByUserId = expenseRow[Expenses.paidByUserId],
+                paymentMethod = expenseRow[Expenses.paymentMethod],
+                splitType = SplitType.valueOf(expenseRow[Expenses.splitType]),
+                notes = expenseRow[Expenses.notes],
+                isCompleted = expenseRow[Expenses.isCompleted],
+                debtors = debtors,
+                paidBy = UserBasic(
+                    id = expenseRow[Users.id], name = expenseRow[Users.name], surname = expenseRow[Users.surname]
+                )
+            )
+        }
+}
+
+fun getTripExpensesByDate(tripId: Int, targetDate: String): List<Expense> = transaction {
+    (Expenses innerJoin Users).selectAll()
+        .where { (Expenses.tripId eq tripId) and (Expenses.date eq targetDate) }
+        .orderBy(Expenses.id to SortOrder.DESC).map { expenseRow ->
+            val expenseId = expenseRow[Expenses.id]
+
+            val debtors = (ExpenseDebtors innerJoin Users).selectAll().where { ExpenseDebtors.expenseId eq expenseId }
+                .map { debtorRow ->
+                    ExpenseDebtor(
+                        id = debtorRow[ExpenseDebtors.id],
+                        userId = debtorRow[ExpenseDebtors.userId],
+                        amount = debtorRow[ExpenseDebtors.amount].toDouble(),
+                        splitValue = debtorRow[ExpenseDebtors.splitValue],
+                        hasPaid = debtorRow[ExpenseDebtors.hasPaid],
                         user = UserBasic(
                             id = debtorRow[Users.id], name = debtorRow[Users.name], surname = debtorRow[Users.surname]
                         )
@@ -175,16 +286,23 @@ fun getExpenseSummary(tripId: Int): ExpenseSummary = transaction {
 
     val amountPaid = expenses.groupBy { it.paidByUserId }.mapValues { (_, expenses) -> expenses.sumOf { it.amount } }
 
+    // Only count unpaid debts in the total owed
     val amountOwed = expenses.flatMap { expense ->
-        expense.debtors.map { debtor ->
+        expense.debtors.filter { !it.hasPaid }.map { debtor ->
             debtor.userId to debtor.amount
         }
     }.groupBy({ it.first }, { it.second }).mapValues { (_, amounts) -> amounts.sum() }
 
     val balances = members.map { member ->
         val paid = amountPaid[member.id] ?: 0.0
-        val owed = amountOwed[member.id] ?: 0.0
-        val balance = paid - owed
+        val stillOwed = amountOwed[member.id] ?: 0.0
+
+        // Calculate how much others still owe to this member (only unpaid debts)
+        val othersOweToMember = expenses.filter { it.paidByUserId == member.id }.sumOf { expense ->
+            expense.debtors.filter { !it.hasPaid && it.userId != member.id }.sumOf { it.amount }
+        }
+
+        val balance = othersOweToMember - stillOwed
 
         UserBalance(
             userId = member.id, name = "${member.name}", balance = balance
@@ -203,16 +321,23 @@ fun getUserExpenseSummary(tripId: Int, currentUserId: Int): UserExpenseSummary =
     val expenses = getTripExpenses(tripId)
     val members = getTripMembers(tripId).filter { it.status == "ACCEPTED" || it.status == "OWNER" }
 
-    // Calculate how much current user paid
+    // Calculate how much current user paid (total amount of expenses they paid for)
     val userPaid = expenses.filter { it.paidByUserId == currentUserId }.sumOf { it.amount }
 
-    // Calculate how much current user owes (their share of all expenses)
+    // Calculate how much current user still owes (only unpaid debts)
     val userOwes = expenses.sumOf { expense ->
-        expense.debtors.find { it.userId == currentUserId }?.amount ?: 0.0
+        expense.debtors.find { it.userId == currentUserId && !it.hasPaid }?.amount ?: 0.0
     }
 
-    // Net balance: positive means user is owed money, negative means user owes money
-    val userBalance = userPaid - userOwes
+    // Calculate how much others still owe to current user (only unpaid debts where user is the payer)
+    val othersOweUser = expenses.filter { it.paidByUserId == currentUserId }.sumOf { expense ->
+        expense.debtors.filter { !it.hasPaid && it.userId != currentUserId }.sumOf { it.amount }
+    }
+
+    // Net balance calculation:
+    // Positive: User is owed money (others owe them more than they owe others)
+    // Negative: User owes money (they owe others more than others owe them)
+    val userBalance = othersOweUser - userOwes
 
     // Calculate amounts for UI display
     val userAmountOwed = if (userBalance < 0) kotlin.math.abs(userBalance) else 0.0
@@ -287,11 +412,13 @@ fun updateExpense(expenseId: Int, updateRequest: UpdateExpenseRequest, userId: I
 
         newDebtors.forEach { debtor ->
             val debtorAmount = debtorAmounts[debtor.userId] ?: 0.0
+            val isCreatorPayer = debtor.userId == newPaidByUserId
             ExpenseDebtors.insert {
                 it[ExpenseDebtors.expenseId] = expenseId
                 it[ExpenseDebtors.userId] = debtor.userId
                 it[ExpenseDebtors.amount] = debtorAmount.toBigDecimal()
                 it[ExpenseDebtors.splitValue] = debtor.splitValue
+                it[ExpenseDebtors.hasPaid] = isCreatorPayer
             }
         }
     }
@@ -310,4 +437,20 @@ fun updateExpense(expenseId: Int, updateRequest: UpdateExpenseRequest, userId: I
 
     // Return the updated expense
     return@transaction getTripExpenses(tripId).find { it.id == expenseId }
+}
+
+fun markDebtorAsPaid(expenseId: Int, userId: Int): Boolean = transaction {
+    ExpenseDebtors.update({
+        (ExpenseDebtors.expenseId eq expenseId) and (ExpenseDebtors.userId eq userId)
+    }) {
+        it[ExpenseDebtors.hasPaid] = true
+    } > 0
+}
+
+fun markDebtorAsUnpaid(expenseId: Int, userId: Int): Boolean = transaction {
+    ExpenseDebtors.update({
+        (ExpenseDebtors.expenseId eq expenseId) and (ExpenseDebtors.userId eq userId)
+    }) {
+        it[ExpenseDebtors.hasPaid] = false
+    } > 0
 }

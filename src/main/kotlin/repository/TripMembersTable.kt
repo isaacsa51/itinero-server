@@ -177,6 +177,12 @@ fun isTripMember(userId: Int, tripId: Int): Boolean = transaction {
         .count() > 0
 }
 
+fun isUserPendingMember(userId: Int, tripId: Int): Boolean = transaction {
+    TripMembers.selectAll()
+        .where { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) and (TripMembers.isPending eq true) }
+        .count() > 0
+}
+
 fun leaveTrip(userId: Int, tripId: Int): Boolean = transaction {
     val deleted = TripMembers.deleteWhere { (TripMembers.userId eq userId) and (TripMembers.tripId eq tripId) } > 0
 

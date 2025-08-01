@@ -71,3 +71,11 @@ data class InviteMemberRequest(
 data class JoinGroupRequest(
     val groupCode: String
 )
+
+@Serializable
+data class MemberStatusResponse(
+    val status: String,
+    val isOwner: Boolean,
+    val isMember: Boolean,
+    val isPending: Boolean
+)

@@ -8,6 +8,7 @@ object ExpenseDebtors : Table("expense_debtors") {
     val userId = integer("user_id").references(Users.id)
     val amount = decimal("amount", 10, 2)
     val splitValue = double("split_value")
+    val hasPaid = bool("has_paid").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }

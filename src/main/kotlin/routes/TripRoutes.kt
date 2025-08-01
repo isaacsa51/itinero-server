@@ -83,9 +83,9 @@ fun Route.tripAssociationRoutes() {
                 return@get
             }
 
-            // Check if user is trip owner
-            if (!isUserTripOwner(user.id, tripId)) {
-                call.respond(HttpStatusCode.Forbidden, "Only trip owner can view trip members")
+            // Check if user is trip member or owner
+            if (!isTripMember(user.id, tripId) && !isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip members can view trip members")
                 return@get
             }
 

@@ -2,6 +2,8 @@ package com.serranoie.server.routes
 
 import com.serranoie.server.models.CreateItineraryItemRequest
 import com.serranoie.server.models.UpdateItineraryItemRequest
+import com.serranoie.server.models.ItineraryItem
+import com.serranoie.server.models.Expense
 import com.serranoie.server.repository.*
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -9,7 +11,9 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import java.time.format.DateTimeFormatter
+import java.time.LocalDate
 import java.util.*
 
 // Helper function to parse date/time from app format
@@ -41,6 +45,14 @@ private fun parseDateTimeFromApp(dateTimeString: String): Pair<String, String> {
         throw IllegalArgumentException("Failed to parse date/time: ${e.message}")
     }
 }
+
+@Serializable
+data class TodayOverviewResponse(
+    val todayItinerary: List<ItineraryItem>,
+    val yesterdayExpenses: List<Expense>,
+    val date: String,
+    val yesterdayDate: String
+)
 
 fun Route.itineraryRoutes() {
     authenticate {
@@ -377,6 +389,66 @@ fun Route.itineraryRoutes() {
                 call.respond(updatedItem!!)
             } else {
                 call.respond(HttpStatusCode.InternalServerError, "Failed to update completion status")
+            }
+        }
+
+        // New endpoint for today's overview (today's itinerary + yesterday's expenses)
+        get("/trips/{groupCode}/today-overview") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+
+            if (email == null || groupCode == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@get
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@get
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@get
+            }
+
+            if (!isTripMember(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "You are not a member of this trip")
+                return@get
+            }
+
+            try {
+                // Get today's date in the format used by the app
+                val today = LocalDate.now()
+                val yesterday = today.minusDays(1)
+
+                // Format dates to match the app's format (e.g., "2025-01-15")
+                val todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                val yesterdayStr = yesterday.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+
+                // Convert today's date to the format used in itinerary items ("31 July 2025")
+                val appDateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.ENGLISH)
+                val todayAppFormat = today.format(appDateFormatter)
+
+                // Get today's itinerary items using the app's date format
+                val todayItineraryItems = getItineraryItemsByGroupCodeAndDate(groupCode, todayAppFormat)
+
+                // Get yesterday's expenses (expenses use ISO format)
+                val yesterdayExpenses = getTripExpensesByDate(tripId, yesterdayStr)
+
+                val response = TodayOverviewResponse(
+                    todayItinerary = todayItineraryItems,
+                    yesterdayExpenses = yesterdayExpenses,
+                    date = todayStr,
+                    yesterdayDate = yesterdayStr
+                )
+
+                call.respond(response)
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, "Failed to fetch today's overview: ${e.message}")
             }
         }
     }

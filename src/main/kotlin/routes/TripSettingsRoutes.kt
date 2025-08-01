@@ -154,6 +154,50 @@ fun Route.tripSettingsRoutes() {
             deleteTrip(result.tripId)
             call.respond(MemberActionResponse(true, "Trip deleted successfully"))
         }
+
+        // Get current member status
+        get("/trips/{groupCode}/member/status") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+
+            if (email == null || groupCode == null) {
+                call.respondText("Invalid request", status = HttpStatusCode.BadRequest)
+                return@get
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respondText("User not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respondText("Trip not found", status = HttpStatusCode.NotFound)
+                return@get
+            }
+
+            val isOwner = isUserTripOwner(user.id, tripId)
+            val isMember = isTripMember(user.id, tripId)
+            val isPending = isUserPendingMember(user.id, tripId)
+
+            val status = when {
+                isOwner -> "OWNER"
+                isMember -> "MEMBER"
+                isPending -> "PENDING"
+                else -> "NOT MEMBER"
+            }
+
+            call.respond(
+                MemberStatusResponse(
+                    status = status,
+                    isOwner = isOwner,
+                    isMember = isMember,
+                    isPending = isPending
+                )
+            )
+        }
     }
 }
 
