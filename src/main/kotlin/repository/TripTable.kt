@@ -2,6 +2,7 @@ package com.serranoie.server.repository
 
 import com.serranoie.server.models.Accommodation
 import com.serranoie.server.models.Trip
+import com.serranoie.server.repository.createChatGroup
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
@@ -22,11 +23,10 @@ object Trips : Table() {
     val accommodationPhone = varchar("accommodation_phone", 20)
     val checkIn = varchar("check_in", 19)
     val checkOut = varchar("check_out", 19)
-    val location = varchar("location", 200)
-    val mapUri = varchar("map_uri", 500)
+    val accommodationLatitude = double("accommodation_latitude")
+    val accommodationLongitude = double("accommodation_longitude")
     val reservationCode = varchar("reservation_code", 50).nullable()
     val extraInfo = text("extra_info").nullable()
-    val additionalInfo = text("additional_info").nullable()
     val groupCode = varchar("group_code", 20).uniqueIndex()
     val groupName = varchar("group_name", 100)
     val ownerId = integer("owner_id").references(Users.id)
@@ -48,12 +48,11 @@ fun getTripById(tripId: Int): Trip? = transaction {
                 phone = row[Trips.accommodationPhone],
                 checkIn = row[Trips.checkIn],
                 checkOut = row[Trips.checkOut],
-                location = row[Trips.location],
-                mapUri = row[Trips.mapUri]
+                latitude = row[Trips.accommodationLatitude],
+                longitude = row[Trips.accommodationLongitude],
+                reservationCode = row[Trips.reservationCode],
+                extraInfo = row[Trips.extraInfo]
             ),
-            reservationCode = row[Trips.reservationCode],
-            extraInfo = row[Trips.extraInfo],
-            additionalInfo = row[Trips.additionalInfo],
             groupCode = row[Trips.groupCode],
             groupName = row[Trips.groupName],
             ownerId = row[Trips.ownerId]
@@ -77,12 +76,11 @@ fun getTripsForUser(userId: Int): List<Trip> = transaction {
                     phone = row[Trips.accommodationPhone],
                     checkIn = row[Trips.checkIn],
                     checkOut = row[Trips.checkOut],
-                    location = row[Trips.location],
-                    mapUri = row[Trips.mapUri]
+                    latitude = row[Trips.accommodationLatitude],
+                    longitude = row[Trips.accommodationLongitude],
+                    reservationCode = row[Trips.reservationCode],
+                    extraInfo = row[Trips.extraInfo]
                 ),
-                reservationCode = row[Trips.reservationCode],
-                extraInfo = row[Trips.extraInfo],
-                additionalInfo = row[Trips.additionalInfo],
                 groupCode = row[Trips.groupCode],
                 groupName = row[Trips.groupName],
                 ownerId = row[Trips.ownerId]
@@ -90,8 +88,6 @@ fun getTripsForUser(userId: Int): List<Trip> = transaction {
         }
 }
 
-
-// Generate a unique group code in format ITN-XXXXX
 fun generateUniqueGroupCode(startDate: String, endDate: String): String = transaction {
     var code: String
     var exists: Boolean
@@ -120,7 +116,7 @@ fun generateUniqueGroupCode(startDate: String, endDate: String): String = transa
     return@transaction code
 }
 
-fun createCompleteTrip(
+suspend fun createCompleteTrip(
     ownerId: Int,
     destination: String,
     startDate: String,
@@ -129,8 +125,7 @@ fun createCompleteTrip(
     accommodation: Accommodation,
     groupName: String,
     reservationCode: String? = null,
-    extraInfo: String? = null,
-    additionalInfo: String? = null
+    extraInfo: String? = null
 ): Trip = transaction {
     val groupCode = generateUniqueGroupCode(startDate, endDate)
 
@@ -145,11 +140,10 @@ fun createCompleteTrip(
         it[Trips.accommodationPhone] = accommodation.phone
         it[Trips.checkIn] = accommodation.checkIn
         it[Trips.checkOut] = accommodation.checkOut
-        it[Trips.location] = accommodation.location
-        it[Trips.mapUri] = accommodation.mapUri
+        it[Trips.accommodationLatitude] = accommodation.latitude
+        it[Trips.accommodationLongitude] = accommodation.longitude
         it[Trips.reservationCode] = reservationCode
         it[Trips.extraInfo] = extraInfo
-        it[Trips.additionalInfo] = additionalInfo
         it[Trips.groupCode] = groupCode
         it[Trips.groupName] = groupName
         it[Trips.ownerId] = ownerId
@@ -170,14 +164,27 @@ fun createCompleteTrip(
         endDate = endDate,
         summary = summary,
         totalMembers = 1,
-        accommodation = accommodation,
-        reservationCode = reservationCode,
-        extraInfo = extraInfo,
-        additionalInfo = additionalInfo,
+        accommodation = Accommodation(
+            name = accommodation.name,
+            phone = accommodation.phone,
+            checkIn = accommodation.checkIn,
+            checkOut = accommodation.checkOut,
+            latitude = accommodation.latitude,
+            longitude = accommodation.longitude,
+            reservationCode = reservationCode,
+            extraInfo = extraInfo
+        ),
         groupCode = groupCode,
         groupName = groupName,
         ownerId = ownerId
     )
+}.also { trip ->
+    // Create corresponding chat group after the transaction completes
+    try {
+        createChatGroup(trip.groupCode, trip.groupName, ownerId)
+    } catch (e: Exception) {
+        println("Warning: Failed to create chat group for trip ${trip.id}: ${e.message}")
+    }
 }
 
 fun createTrip(trip: Trip, userId: Int): Trip = transaction {
@@ -192,11 +199,10 @@ fun createTrip(trip: Trip, userId: Int): Trip = transaction {
         it[accommodationPhone] = trip.accommodation.phone
         it[checkIn] = trip.accommodation.checkIn
         it[checkOut] = trip.accommodation.checkOut
-        it[location] = trip.accommodation.location
-        it[mapUri] = trip.accommodation.mapUri
-        it[reservationCode] = trip.reservationCode
-        it[extraInfo] = trip.extraInfo
-        it[additionalInfo] = trip.additionalInfo
+        it[accommodationLatitude] = trip.accommodation.latitude
+        it[accommodationLongitude] = trip.accommodation.longitude
+        it[reservationCode] = trip.accommodation.reservationCode
+        it[extraInfo] = trip.accommodation.extraInfo
         it[groupCode] = trip.groupCode
         it[groupName] = trip.groupName
         it[ownerId] = trip.ownerId
@@ -219,12 +225,11 @@ fun findTripForUser(userId: Int): Trip? = transaction {
                 phone = it[Trips.accommodationPhone],
                 checkIn = it[Trips.checkIn],
                 checkOut = it[Trips.checkOut],
-                location = it[Trips.location],
-                mapUri = it[Trips.mapUri]
+                latitude = it[Trips.accommodationLatitude],
+                longitude = it[Trips.accommodationLongitude],
+                reservationCode = it[Trips.reservationCode],
+                extraInfo = it[Trips.extraInfo]
             ),
-            reservationCode = it[Trips.reservationCode],
-            extraInfo = it[Trips.extraInfo],
-            additionalInfo = it[Trips.additionalInfo],
             groupCode = it[Trips.groupCode],
             groupName = it[Trips.groupName],
             ownerId = it[Trips.ownerId]
@@ -254,12 +259,11 @@ fun findAllTripsForUser(userId: Int): List<Trip> = transaction {
                 phone = it[Trips.accommodationPhone],
                 checkIn = it[Trips.checkIn],
                 checkOut = it[Trips.checkOut],
-                location = it[Trips.location],
-                mapUri = it[Trips.mapUri]
+                latitude = it[Trips.accommodationLatitude],
+                longitude = it[Trips.accommodationLongitude],
+                reservationCode = it[Trips.reservationCode],
+                extraInfo = it[Trips.extraInfo]
             ),
-            reservationCode = it[Trips.reservationCode],
-            extraInfo = it[Trips.extraInfo],
-            additionalInfo = it[Trips.additionalInfo],
             groupCode = it[Trips.groupCode],
             groupName = it[Trips.groupName],
             ownerId = it[Trips.ownerId]

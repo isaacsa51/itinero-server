@@ -10,9 +10,9 @@ data class TripInfoSettings(
     val checkOut: String,
     val phone: String,
     val reservationCode: String?,
-    val location: Location,
-    val additionalLocationInfo: String?,
-    val generalInfo: String?
+    val latitude: Double,
+    val longitude: Double,
+    val extraInfo: String?
 )
 
 @Serializable
@@ -44,8 +44,7 @@ data class UpdateTripInfoRequest(
     val summary: String,
     val accommodation: Accommodation,
     val reservationCode: String?,
-    val extraInfo: String?,
-    val additionalInfo: String?
+    val extraInfo: String?
 )
 
 @Serializable

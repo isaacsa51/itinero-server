@@ -217,12 +217,11 @@ fun findMemberTrips(userId: Int): List<Trip> = transaction {
                     phone = it[Trips.accommodationPhone],
                     checkIn = it[Trips.checkIn],
                     checkOut = it[Trips.checkOut],
-                    location = it[Trips.location],
-                    mapUri = it[Trips.mapUri]
+                    latitude = it[Trips.accommodationLatitude],
+                    longitude = it[Trips.accommodationLongitude],
+                    reservationCode = it[Trips.reservationCode],
+                    extraInfo = it[Trips.extraInfo]
                 ),
-                reservationCode = it[Trips.reservationCode],
-                extraInfo = it[Trips.extraInfo],
-                additionalInfo = it[Trips.additionalInfo],
                 groupCode = it[Trips.groupCode],
                 ownerId = it[Trips.ownerId]
             )
@@ -241,13 +240,9 @@ fun getTripInfoSettings(tripId: Int): TripInfoSettings? = transaction {
         checkOut = trip[Trips.checkOut],
         phone = trip[Trips.accommodationPhone],
         reservationCode = trip[Trips.reservationCode],
-        location = Location(
-            name = trip[Trips.location],
-            latitude = 0.0,
-            longitude = 0.0
-        ),
-        additionalLocationInfo = trip[Trips.extraInfo],
-        generalInfo = trip[Trips.additionalInfo]
+        latitude = trip[Trips.accommodationLatitude],
+        longitude = trip[Trips.accommodationLongitude],
+        extraInfo = trip[Trips.extraInfo]
     )
 }
 
@@ -270,11 +265,10 @@ fun updateTripInfo(groupCode: String, request: UpdateTripInfoRequest): Boolean =
         it[accommodationPhone] = request.accommodation.phone
         it[checkIn] = request.accommodation.checkIn
         it[checkOut] = request.accommodation.checkOut
-        it[location] = request.accommodation.location
-        it[mapUri] = request.accommodation.mapUri
+        it[accommodationLatitude] = request.accommodation.latitude
+        it[accommodationLongitude] = request.accommodation.longitude
         it[reservationCode] = request.reservationCode
         it[extraInfo] = request.extraInfo
-        it[additionalInfo] = request.additionalInfo
     } > 0
 }
 

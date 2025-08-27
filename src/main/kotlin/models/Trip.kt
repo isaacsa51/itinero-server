@@ -11,9 +11,6 @@ data class Trip(
     val summary: String,
     val totalMembers: Int,
     val accommodation: Accommodation,
-    val reservationCode: String? = null,
-    val extraInfo: String? = null,
-    val additionalInfo: String? = null,
     val groupCode: String,
     val groupName: String,
     val ownerId: Int,
@@ -25,8 +22,10 @@ data class Accommodation(
     val phone: String,
     val checkIn: String,
     val checkOut: String,
-    val location: String,
-    val mapUri: String
+    val latitude: Double,
+    val longitude: Double,
+    val reservationCode: String? = null,
+    val extraInfo: String? = null
 )
 
 @Serializable

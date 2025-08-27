@@ -4,11 +4,15 @@ import com.serranoie.server.security.JwtConfig
 import com.serranoie.server.models.AuthResponse
 import com.serranoie.server.models.LoginRequest
 import com.serranoie.server.models.RegisterRequest
+import com.serranoie.server.models.DeleteAccountRequest
 import com.serranoie.server.models.User
 import com.serranoie.server.repository.createUser
 import com.serranoie.server.repository.findUserByEmail
+import com.serranoie.server.repository.deleteUser
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -23,6 +27,11 @@ fun Route.authRoutes() {
         }
         post("/login") {
             handleLogin(call)
+        }
+        authenticate {
+            delete("/delete-account") {
+                handleDeleteAccount(call)
+            }
         }
     }
 }
@@ -49,7 +58,7 @@ private suspend fun handleRegistration(call: ApplicationCall) {
             )
         )
 
-        respondWithToken(call, newUser.email, newUser.id, newUser.name)
+        respondWithToken(call, newUser.email, newUser.id, newUser.name, newUser.surname)
 
     } catch (e: ExposedSQLException) {
         if (e.message?.contains("unique constraint") == true || e.message?.contains("UNIQUE constraint failed") == true) {
@@ -72,15 +81,52 @@ private suspend fun handleLogin(call: ApplicationCall) {
             return
         }
 
-        respondWithToken(call, user.email, user.id, user.name)
+        respondWithToken(call, user.email, user.id, user.name, user.surname)
     } catch (e: Exception) {
         handleServerError(call, e)
     }
 }
 
-private suspend fun respondWithToken(call: ApplicationCall, email: String, userId: Int, userName: String) {
+private suspend fun handleDeleteAccount(call: ApplicationCall) {
+    try {
+        val req = call.receive<DeleteAccountRequest>()
+        val principal = call.principal<JWTPrincipal>()
+        val email = principal?.payload?.getClaim("email")?.asString()
+
+        if (email == null) {
+            call.respondText("Unauthorized", status = HttpStatusCode.Unauthorized)
+            return
+        }
+
+        val userByEmail = findUserByEmail(email)
+
+        if (userByEmail == null) {
+            call.respondText("User not found", status = HttpStatusCode.NotFound)
+            return
+        }
+
+        if (!BCrypt.checkpw(req.password, userByEmail.passwordHash)) {
+            call.respondText("Invalid password", status = HttpStatusCode.Unauthorized)
+            return
+        }
+
+        deleteUser(userByEmail.id)
+
+        call.respondText("Account deleted successfully", status = HttpStatusCode.OK)
+    } catch (e: Exception) {
+        handleServerError(call, e)
+    }
+}
+
+private suspend fun respondWithToken(
+    call: ApplicationCall,
+    email: String,
+    userId: Int,
+    userName: String,
+    userLastName: String
+) {
     val token = JwtConfig.generateToken(email)
-    call.respond(AuthResponse(token, userId, userName))
+    call.respond(AuthResponse(token, userId, userName, userLastName))
 }
 
 private suspend fun handleServerError(call: ApplicationCall, e: Exception) {

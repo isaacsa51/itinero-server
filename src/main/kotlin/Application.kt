@@ -2,6 +2,7 @@ package com.serranoie.server
 
 import com.serranoie.server.plugins.configureDatabases
 import com.serranoie.server.routes.authRoutes
+import com.serranoie.server.routes.chatRoutes
 import com.serranoie.server.routes.expenseRoutes
 import com.serranoie.server.routes.itineraryRoutes
 import com.serranoie.server.routes.tripAssociationRoutes
@@ -40,6 +41,8 @@ fun Application.module() {
         }
     }
 
+    configureSockets()
+
     routing {
         authRoutes()
 
@@ -55,6 +58,9 @@ fun Application.module() {
 
             // Itinerary management endpoints
             itineraryRoutes()
+
+            // Chat management endpoints
+            chatRoutes()
         }
     }
 }

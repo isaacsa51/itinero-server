@@ -93,7 +93,6 @@ fun Route.tripAssociationRoutes() {
             call.respond(allMembers)
         }
 
-        // Accept a pending member
         post("/trips/{groupCode}/members/{memberId}/accept") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -131,7 +130,6 @@ fun Route.tripAssociationRoutes() {
             }
         }
 
-        // Remove/reject a member
         delete("/trips/{groupCode}/members/{memberId}") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -175,7 +173,6 @@ fun Route.tripAssociationRoutes() {
             }
         }
 
-        // Make a member the new owner
         post("/trips/{groupCode}/members/{memberId}/make-owner") {
             val principal = call.principal<JWTPrincipal>()
             val email = principal?.payload?.getClaim("email")?.asString()
@@ -276,8 +273,7 @@ fun Route.tripAssociationRoutes() {
                     accommodation = request.accommodation,
                     groupName = request.groupName,
                     reservationCode = request.reservationCode,
-                    extraInfo = request.extraInfo,
-                    additionalInfo = request.additionalInfo
+                    extraInfo = request.extraInfo
                 )
 
                 call.respond(HttpStatusCode.Created, trip)
@@ -286,6 +282,43 @@ fun Route.tripAssociationRoutes() {
                 call.respondText(
                     "Failed to create trip: ${e.message}", status = HttpStatusCode.InternalServerError
                 )
+            }
+        }
+
+        delete("/trips/{groupCode}") {
+            val principal = call.principal<JWTPrincipal>()
+            val email = principal?.payload?.getClaim("email")?.asString()
+            val groupCode = call.parameters["groupCode"]
+
+            if (email == null || groupCode == null) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request")
+                return@delete
+            }
+
+            val user = findUserByEmail(email)
+            if (user == null) {
+                call.respond(HttpStatusCode.NotFound, "User not found")
+                return@delete
+            }
+
+            val tripId = findTripByGroupCode(groupCode)
+            if (tripId == null) {
+                call.respond(HttpStatusCode.NotFound, "Trip not found")
+                return@delete
+            }
+
+            // Check if user is trip owner - only owner can delete the trip
+            if (!isUserTripOwner(user.id, tripId)) {
+                call.respond(HttpStatusCode.Forbidden, "Only trip owner can delete the trip")
+                return@delete
+            }
+
+            try {
+                deleteTrip(tripId)
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Trip deleted successfully"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to delete trip"))
             }
         }
     }
